@@ -1,3 +1,4 @@
+// Color scheme mapping for different sports - used throughout the UI for consistency
 export const SPORT_COLORS: Record<string, string> = {
   AFL: '#D32F2F',
   NRL: '#2E7D32',
