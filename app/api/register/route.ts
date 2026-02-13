@@ -47,10 +47,10 @@ export async function POST(request: Request) {
       { id: user.id, email: user.email, name: user.name },
       { status: 201 }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error)
     return NextResponse.json(
-      { error: 'Something went wrong' },
+      { error: 'Something went wrong', detail: error?.message || String(error) },
       { status: 500 }
     )
   }
