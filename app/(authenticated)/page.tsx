@@ -2,13 +2,25 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { format } from 'date-fns'
+import { format, differenceInHours, differenceInMinutes, differenceInDays } from 'date-fns'
 import {
   Trophy, Target, TrendingUp, Calendar, CheckCircle2,
-  Circle, ChevronRight
+  Circle, Users
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type { ScoreGame, Event } from '@/lib/types'
+
+function formatCountdown(eventDate: Date): string {
+  const now = new Date()
+  const days = differenceInDays(eventDate, now)
+  const hours = differenceInHours(eventDate, now)
+  const mins = differenceInMinutes(eventDate, now) % 60
+
+  if (hours < 0) return 'Started'
+  if (days >= 1) return format(eventDate, 'EEE d MMM, h:mm a')
+  if (hours >= 1) return `${hours}h ${mins}m`
+  return `${mins}m`
+}
 
 function GameCard({ game }: { game: ScoreGame }) {
   const commence = new Date(game.commenceTime)
@@ -21,7 +33,7 @@ function GameCard({ game }: { game: ScoreGame }) {
   } else if (isCompleted) {
     timeLabel = 'FT'
   } else {
-    timeLabel = format(commence, 'EEE d MMM')
+    timeLabel = formatCountdown(commence)
   }
 
   const sportColor = SPORT_COLORS[game.sport] || '#D32F2F'
@@ -30,7 +42,7 @@ function GameCard({ game }: { game: ScoreGame }) {
   const hasScores = homeScore != null && awayScore != null
 
   return (
-    <div className={`glass-card p-3 space-y-2 hover-elevate ${isCompleted ? 'opacity-80' : ''}`}>
+    <div className={`glass-card rounded-xl p-3 space-y-2 hover-elevate ${isCompleted ? 'opacity-80' : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <span
           className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border"
@@ -66,12 +78,19 @@ function GameCard({ game }: { game: ScoreGame }) {
   )
 }
 
+interface LeaderboardEntry {
+  rank: number
+  user: { id: string; name: string | null; email: string }
+  score: number
+}
+
 export default function Dashboard() {
   const { data: session } = useSession()
   const [activeFilter, setActiveFilter] = useState('all')
   const [events, setEvents] = useState<Event[]>([])
   const [scores, setScores] = useState<ScoreGame[]>([])
   const [userPicks, setUserPicks] = useState<any[]>([])
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -91,21 +110,36 @@ export default function Dashboard() {
         ]);
       };
 
-      const [eventsRes, scoresRes, picksRes] = await Promise.all([
+      const [eventsRes, scoresRes, picksRes, compsRes] = await Promise.all([
         fetchWithTimeout('/api/events').catch(() => ({ json: async () => [] })),
         fetchWithTimeout('/api/scores').catch(() => ({ json: async () => [] })),
-        fetchWithTimeout('/api/picks').catch(() => ({ json: async () => [] }))
+        fetchWithTimeout('/api/picks').catch(() => ({ json: async () => [] })),
+        fetchWithTimeout('/api/competitions').catch(() => ({ json: async () => [] })),
       ])
 
-      const [eventsData, scoresData, picksData] = await Promise.all([
+      const [eventsData, scoresData, picksData, compsData] = await Promise.all([
         eventsRes.json(),
         scoresRes.json(),
-        picksRes.json()
+        picksRes.json(),
+        compsRes.json(),
       ])
 
       setEvents(Array.isArray(eventsData) ? eventsData : [])
       setScores(Array.isArray(scoresData) ? scoresData : [])
       setUserPicks(Array.isArray(picksData) ? picksData : [])
+
+      // Fetch leaderboard for the first active public competition
+      const comps = Array.isArray(compsData) ? compsData : []
+      const activeComp = comps.find((c: any) => c.isPublic && c.status === 'active') || comps[0]
+      if (activeComp) {
+        try {
+          const lbRes = await fetchWithTimeout(`/api/leaderboard?competitionId=${activeComp.id}`)
+          const lbData = await lbRes.json()
+          setLeaderboard(Array.isArray(lbData) ? lbData : [])
+        } catch {
+          // Leaderboard is non-critical
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -162,16 +196,16 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-black/30 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
           <h1 className="text-4xl font-black tracking-tight mb-2 text-white">
-            G'day, <span className="gold-accent">{session?.user?.name?.split(' ')[0] || 'Tipster'}</span>
+            G&apos;day, <span className="gold-accent">{session?.user?.name?.split(' ')[0] || 'Tipster'}</span>
           </h1>
-          <p className="text-white/70 text-lg mb-8">Here's what's happening.</p>
+          <p className="text-white/70 text-lg mb-8">Here&apos;s what&apos;s happening.</p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Your Picks', value: `${userPicksCount}/50`, icon: Target },
               { label: 'Correct', value: correctPicks, icon: CheckCircle2 },
-              { label: 'Win Rate', value: userPicksCount > 0 ? `${Math.round((correctPicks / userPicksCount) * 100)}%` : '—', icon: TrendingUp },
-              { label: 'Rank', value: '—', icon: Trophy },
+              { label: 'Win Rate', value: userPicksCount > 0 ? `${Math.round((correctPicks / userPicksCount) * 100)}%` : '--', icon: TrendingUp },
+              { label: 'Rank', value: '--', icon: Trophy },
             ].map((stat, i) => (
               <div key={i} className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover-elevate cursor-default">
                 <stat.icon className="w-5 h-5 mb-2 gold-accent" />
@@ -185,6 +219,62 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        {/* Leaderboard */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 gold-accent" />
+            <h2 className="text-lg font-bold uppercase tracking-wider">Leaderboard</h2>
+          </div>
+          {leaderboard.length > 0 ? (
+            <div className="glass-card rounded-xl overflow-hidden">
+              <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">
+                <div className="w-10 text-center">#</div>
+                <div className="flex-1">Tipster</div>
+                <div className="w-20 text-center">Score</div>
+              </div>
+              {leaderboard.slice(0, 10).map((entry) => {
+                const isCurrentUser = (session?.user as any)?.id === entry.user.id
+                return (
+                  <div
+                    key={entry.user.id}
+                    className={`flex items-center gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors ${
+                      isCurrentUser ? 'bg-primary/10' : ''
+                    }`}
+                  >
+                    <div className="w-10 text-center">
+                      {entry.rank <= 3 ? (
+                        <span className={`text-sm font-black ${entry.rank === 1 ? 'gold-accent' : 'text-muted-foreground'}`}>
+                          {entry.rank}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-semibold text-muted-foreground">{entry.rank}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="w-7 h-7 brand-gradient rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                        {entry.user.name?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <span className={`text-sm truncate ${isCurrentUser ? 'font-bold' : 'font-medium'}`}>
+                        {entry.user.name || entry.user.email}
+                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">(you)</span>}
+                      </span>
+                    </div>
+                    <div className="w-20 text-center">
+                      <span className="text-sm font-bold tabular-nums">{entry.score}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground glass-card rounded-xl">
+              <Trophy className="w-8 h-8 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No leaderboard data yet.</p>
+              <p className="text-xs mt-1">Join a competition to see rankings!</p>
+            </div>
+          )}
+        </section>
 
         {/* Live & Upcoming Games */}
         {upcomingGames.length > 0 && (
@@ -223,15 +313,15 @@ export default function Dashboard() {
               <Target className="w-5 h-5 gold-accent" />
               <h2 className="text-lg font-bold uppercase tracking-wider">Make Your Picks</h2>
             </div>
-            <div className="flex gap-2 glass-card p-1 rounded-lg">
+            <div className="flex gap-1 bg-muted/50 border border-border p-1 rounded-lg">
               {['all', 'live', 'upcoming', 'my-picks'].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setActiveFilter(filter)}
                   className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${
                     activeFilter === filter
-                      ? 'brand-gradient text-white'
-                      : 'text-muted-foreground hover:bg-muted/50'
+                      ? 'brand-gradient text-white shadow-sm'
+                      : 'text-foreground/70 hover:text-foreground hover:bg-muted'
                   }`}
                 >
                   {filter === 'all' && 'All'}
@@ -247,9 +337,11 @@ export default function Dashboard() {
             {filteredEvents.map((event) => {
               const userPick = getUserPick(event.id)
               const sportColor = SPORT_COLORS[event.sport] || '#D32F2F'
+              const eventDate = new Date(event.eventDate)
+              const isUpcoming = event.status === 'upcoming'
 
               return (
-                <div key={event.id} className="glass-card p-4 hover-elevate space-y-3">
+                <div key={event.id} className="glass-card rounded-xl p-4 hover-elevate space-y-3">
                   <div className="flex justify-between items-start">
                     <span
                       className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide"
@@ -257,8 +349,8 @@ export default function Dashboard() {
                     >
                       {event.sport}
                     </span>
-                    <span className="text-muted-foreground text-sm font-semibold">
-                      {format(new Date(event.eventDate), 'MMM d')}
+                    <span className="text-muted-foreground text-xs font-semibold">
+                      {isUpcoming ? formatCountdown(eventDate) : format(eventDate, 'MMM d')}
                     </span>
                   </div>
 
@@ -268,7 +360,7 @@ export default function Dashboard() {
                       className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
                         userPick === 'team1'
                           ? 'bg-primary/15 border-primary'
-                          : 'glass-card border-transparent hover:border-border'
+                          : 'bg-muted/30 border-border hover:border-foreground/30'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -285,7 +377,7 @@ export default function Dashboard() {
                       className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
                         userPick === 'team2'
                           ? 'bg-primary/15 border-primary'
-                          : 'glass-card border-transparent hover:border-border'
+                          : 'bg-muted/30 border-border hover:border-foreground/30'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -299,11 +391,11 @@ export default function Dashboard() {
                   </div>
 
                   {userPick ? (
-                    <div className="p-3 rounded-lg font-semibold text-sm text-center" style={{ backgroundColor: '#4CAF5020', borderColor: '#4CAF5050', color: '#4CAF50', border: '1px solid' }}>
+                    <div className="p-3 rounded-lg font-semibold text-sm text-center bg-green-500/15 border border-green-500/40 text-green-500">
                       Pick Locked: {userPick === 'team1' ? event.team1Abbr : event.team2Abbr}
                     </div>
                   ) : (
-                    <div className="p-3 rounded-lg font-semibold text-sm text-center" style={{ backgroundColor: '#FFD70020', borderColor: '#FFD70050', border: '1px solid' }}>
+                    <div className="p-3 rounded-lg font-semibold text-sm text-center bg-yellow-500/15 border border-yellow-500/40">
                       <span className="gold-accent">Make Your Pick</span>
                     </div>
                   )}
@@ -315,7 +407,7 @@ export default function Dashboard() {
           {filteredEvents.length === 0 && (
             <div className="text-center py-12 text-muted-foreground glass-card rounded-xl">
               <p className="text-sm">No events found for this filter.</p>
-              <p className="text-xs mt-2">Add some events in Prisma Studio or check back later!</p>
+              <p className="text-xs mt-2">Check back later for upcoming events!</p>
             </div>
           )}
         </section>

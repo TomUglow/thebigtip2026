@@ -7,17 +7,33 @@
 :root {
   --background: 220 20% 7%;
   --foreground: 210 20% 92%;
-  
+
   --primary: 0 72% 51%;
   --primary-foreground: 0 0% 100%;
-  
+
   --muted: 220 15% 15%;
   --muted-foreground: 215 12% 50%;
-  
+
   --card: 220 18% 10%;
   --card-foreground: 210 20% 92%;
-  
+
   --border: 220 12% 17%;
+}
+
+:root.light {
+  --background: 0 0% 98%;
+  --foreground: 220 15% 15%;
+
+  --primary: 0 72% 51%;
+  --primary-foreground: 0 0% 100%;
+
+  --muted: 220 15% 92%;
+  --muted-foreground: 215 12% 45%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 15%;
+
+  --border: 220 12% 88%;
 }
 
 @layer base {
@@ -44,6 +60,10 @@
 
   .gold-accent {
     color: #FFD700;
+  }
+
+  .light .gold-accent {
+    color: #B8860B;
   }
 
   .glass-card {

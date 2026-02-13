@@ -3,9 +3,12 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
+import { useTheme } from '@/components/ThemeProvider'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { theme } = useTheme()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,7 +46,6 @@ export default function RegisterPage() {
         return
       }
 
-      // Auto sign in after registration
       const result = await signIn('credentials', {
         email,
         password,
@@ -64,20 +66,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0a] to-[#1a1a1a] flex items-center justify-center px-6">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-brand-gradient rounded-2xl flex items-center justify-center font-black text-3xl shadow-xl shadow-brand-red/40 mx-auto mb-4">
-            TBT
-          </div>
-          <h1 className="text-4xl font-black tracking-tight mb-2">
-            <span className="text-[0.9rem] font-light block -mb-1 opacity-70">the</span>
-            <span className="text-gradient">BIG TIP</span>
-          </h1>
-          <p className="text-white/60">Create your account</p>
+          <Image
+            src={theme === 'light' ? '/TBT_Logo_White.png' : '/TBT_Logo_Black.png'}
+            alt="The Big Tip"
+            width={240}
+            height={120}
+            className="h-28 w-auto mx-auto mb-4"
+          />
+          <p className="text-muted-foreground">Create your account</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
+        <div className="glass-card rounded-2xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
@@ -94,7 +96,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-brand-red transition-colors text-white"
+                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary transition-colors text-foreground"
                 placeholder="Your name"
               />
             </div>
@@ -108,7 +110,7 @@ export default function RegisterPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-brand-red transition-colors text-white"
+                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary transition-colors text-foreground"
                 placeholder="your@email.com"
                 required
               />
@@ -123,7 +125,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-brand-red transition-colors text-white"
+                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary transition-colors text-foreground"
                 placeholder="Min. 6 characters"
                 required
               />
@@ -138,7 +140,7 @@ export default function RegisterPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-brand-red transition-colors text-white"
+                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary transition-colors text-foreground"
                 placeholder="Re-enter password"
                 required
               />
@@ -147,15 +149,15 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-brand-gradient text-white font-bold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50"
+              className="w-full py-3 brand-gradient text-white font-bold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Sign Up'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-white/50">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <a href="/login" className="text-brand-red font-semibold hover:underline">
+            <a href="/login" className="text-primary font-semibold hover:underline">
               Sign in
             </a>
           </div>

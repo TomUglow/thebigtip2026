@@ -99,7 +99,16 @@ export default function LiveScoresTicker() {
       try {
         const res = await fetch('/api/scores')
         const data = await res.json()
-        if (Array.isArray(data)) setScores(data.slice(0, 20))
+        if (Array.isArray(data)) {
+          // Order: completed (oldest first) → live → upcoming
+          // So users can scroll left to see past results
+          const completed = data.filter((g: ScoreGame) => g.completed)
+            .sort((a: ScoreGame, b: ScoreGame) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime())
+          const live = data.filter((g: ScoreGame) => g.scores && !g.completed)
+          const upcoming = data.filter((g: ScoreGame) => !g.scores && !g.completed)
+            .sort((a: ScoreGame, b: ScoreGame) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime())
+          setScores([...completed, ...live, ...upcoming].slice(0, 30))
+        }
       } catch {
         // Ticker is non-critical — fail silently
       } finally {
@@ -113,8 +122,16 @@ export default function LiveScoresTicker() {
   }, [])
 
   useEffect(() => {
-    updateScrollState()
     const el = scrollRef.current
+    if (el && scores.length > 0) {
+      // Auto-scroll to the first live or upcoming game (past results are on the left)
+      const completedCount = scores.filter(g => g.completed).length
+      if (completedCount > 0) {
+        const cardWidth = 180 // min-w-[180px]
+        el.scrollLeft = Math.max(0, (completedCount - 1) * cardWidth)
+      }
+    }
+    updateScrollState()
     if (el) el.addEventListener('scroll', updateScrollState)
     return () => { el?.removeEventListener('scroll', updateScrollState) }
   }, [scores])

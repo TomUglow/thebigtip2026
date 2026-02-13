@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Trophy, Menu, X } from 'lucide-react'
+import Image from 'next/image'
+import { LayoutDashboard, Trophy, Menu, X, Sun, Moon } from 'lucide-react'
+import { useTheme } from '@/components/ThemeProvider'
 
 const navLinks = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,6 +16,7 @@ const navLinks = [
 export default function Navbar() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const { theme, toggleTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
@@ -21,14 +24,14 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Logo + Nav Links */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center font-black text-sm shadow-lg text-white">
-              TBT
-            </div>
-            <div className="font-black text-xl tracking-tight">
-              <span className="text-[0.6rem] font-light block -mb-1 text-foreground/70">the</span>
-              <span className="text-gradient">BIG TIP</span>
-            </div>
+          <Link href="/" className="flex items-center">
+            <Image
+              src={theme === 'light' ? '/TBT_Logo_White.png' : '/TBT_Logo_Black.png'}
+              alt="The Big Tip"
+              width={120}
+              height={36}
+              className="h-9 w-auto"
+            />
           </Link>
 
           {/* Desktop Nav Links */}
@@ -57,6 +60,15 @@ export default function Navbar() {
 
         {/* Right Side */}
         <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
           {session && (
             <>
               {/* Desktop User */}
