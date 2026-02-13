@@ -2,44 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { format, isToday, isTomorrow } from 'date-fns'
+import { format } from 'date-fns'
 import {
   Trophy, Target, TrendingUp, Calendar, CheckCircle2,
   Circle, ChevronRight
 } from 'lucide-react'
-
-interface ScoreGame {
-  id: string
-  sport: string
-  homeTeam: string
-  awayTeam: string
-  commenceTime: string
-  completed: boolean
-  scores: { name: string; score: string }[] | null
-}
-
-interface Event {
-  id: string
-  sport: string
-  eventDate: string
-  status: string
-  team1Name: string
-  team1Abbr: string
-  team1Odds: string | null
-  team2Name: string
-  team2Abbr: string
-  team2Odds: string | null
-}
-
-const SPORT_COLORS: Record<string, string> = {
-  AFL: '#D32F2F',
-  NRL: '#2E7D32',
-  NBA: '#1565C0',
-  NFL: '#4527A0',
-  'Premier League': '#6A1B9A',
-  MLS: '#00695C',
-}
+import { SPORT_COLORS } from '@/lib/constants'
+import type { ScoreGame, Event } from '@/lib/types'
 
 function GameCard({ game }: { game: ScoreGame }) {
   const commence = new Date(game.commenceTime)
@@ -51,10 +20,6 @@ function GameCard({ game }: { game: ScoreGame }) {
     timeLabel = 'LIVE'
   } else if (isCompleted) {
     timeLabel = 'FT'
-  } else if (isToday(commence)) {
-    timeLabel = `Today ${format(commence, 'h:mm a')}`
-  } else if (isTomorrow(commence)) {
-    timeLabel = `Tomorrow ${format(commence, 'h:mm a')}`
   } else {
     timeLabel = format(commence, 'EEE d MMM')
   }
@@ -102,19 +67,12 @@ function GameCard({ game }: { game: ScoreGame }) {
 }
 
 export default function Dashboard() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { data: session } = useSession()
   const [activeFilter, setActiveFilter] = useState('all')
   const [events, setEvents] = useState<Event[]>([])
   const [scores, setScores] = useState<ScoreGame[]>([])
   const [userPicks, setUserPicks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    }
-  }, [status, router])
 
   useEffect(() => {
     if (session) {
@@ -132,19 +90,19 @@ export default function Dashboard() {
           )
         ]);
       };
-  
+
       const [eventsRes, scoresRes, picksRes] = await Promise.all([
         fetchWithTimeout('/api/events').catch(() => ({ json: async () => [] })),
         fetchWithTimeout('/api/scores').catch(() => ({ json: async () => [] })),
         fetchWithTimeout('/api/picks').catch(() => ({ json: async () => [] }))
       ])
-  
+
       const [eventsData, scoresData, picksData] = await Promise.all([
         eventsRes.json(),
         scoresRes.json(),
         picksRes.json()
       ])
-  
+
       setEvents(Array.isArray(eventsData) ? eventsData : [])
       setScores(Array.isArray(scoresData) ? scoresData : [])
       setUserPicks(Array.isArray(picksData) ? picksData : [])
@@ -189,38 +147,16 @@ export default function Dashboard() {
   const userPicksCount = userPicks.length
   const correctPicks = userPicks.filter(p => p.isCorrect).length
 
-  if (status === 'loading' || loading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-foreground text-xl">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="glass-card border-b sticky top-0 z-50 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 brand-gradient rounded-xl flex items-center justify-center font-black text-lg shadow-lg">
-              TBT
-            </div>
-            <div className="font-black text-2xl tracking-tight">
-              <span className="text-[0.7rem] font-light block -mb-1 text-foreground/70">the</span>
-              <span className="text-gradient">BIG TIP</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 glass-card px-4 py-2 rounded-full">
-            <div className="w-7 h-7 brand-gradient rounded-full flex items-center justify-center text-xs font-bold text-white">
-              {session?.user?.name?.[0]?.toUpperCase() || 'U'}
-            </div>
-            <span className="text-sm font-medium">{session?.user?.name || 'User'}</span>
-          </div>
-        </div>
-      </nav>
-
+    <>
       {/* Hero Section */}
       <div className="brand-gradient border-b border-white/10 py-12 px-6 relative">
         <div className="absolute inset-0 bg-black/30 pointer-events-none" />
@@ -249,7 +185,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        
+
         {/* Live & Upcoming Games */}
         {upcomingGames.length > 0 && (
           <section>
@@ -311,7 +247,7 @@ export default function Dashboard() {
             {filteredEvents.map((event) => {
               const userPick = getUserPick(event.id)
               const sportColor = SPORT_COLORS[event.sport] || '#D32F2F'
-              
+
               return (
                 <div key={event.id} className="glass-card p-4 hover-elevate space-y-3">
                   <div className="flex justify-between items-start">
@@ -364,11 +300,11 @@ export default function Dashboard() {
 
                   {userPick ? (
                     <div className="p-3 rounded-lg font-semibold text-sm text-center" style={{ backgroundColor: '#4CAF5020', borderColor: '#4CAF5050', color: '#4CAF50', border: '1px solid' }}>
-                      ✓ Pick Locked: {userPick === 'team1' ? event.team1Abbr : event.team2Abbr}
+                      Pick Locked: {userPick === 'team1' ? event.team1Abbr : event.team2Abbr}
                     </div>
                   ) : (
                     <div className="p-3 rounded-lg font-semibold text-sm text-center" style={{ backgroundColor: '#FFD70020', borderColor: '#FFD70050', border: '1px solid' }}>
-                      <span className="gold-accent">⏳ Make Your Pick</span>
+                      <span className="gold-accent">Make Your Pick</span>
                     </div>
                   )}
                 </div>
@@ -384,6 +320,6 @@ export default function Dashboard() {
           )}
         </section>
       </div>
-    </div>
+    </>
   )
 }
