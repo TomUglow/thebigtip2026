@@ -192,10 +192,10 @@ export default function Dashboard() {
   return (
     <>
       {/* Hero Section */}
-      <div className="brand-gradient border-b border-white/10 py-12 px-6 relative">
+      <div className="border-b border-white/10 py-12 px-6 relative">
         <div className="absolute inset-0 bg-black/30 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <h1 className="text-4xl font-black tracking-tight mb-2 text-white">
+          <h1 className="text-4xl font-black tracking-tight mb-2 text-white font-display">
             G&apos;day, <span className="gold-accent">{session?.user?.name?.split(' ')[0] || 'Tipster'}</span>
           </h1>
           <p className="text-white/70 text-lg mb-8">Here&apos;s what&apos;s happening.</p>
@@ -209,7 +209,7 @@ export default function Dashboard() {
             ].map((stat, i) => (
               <div key={i} className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover-elevate cursor-default">
                 <stat.icon className="w-5 h-5 mb-2 gold-accent" />
-                <div className="text-3xl font-black text-white mb-1">{stat.value}</div>
+                <div className="text-3xl font-black text-white mb-1 font-display">{stat.value}</div>
                 <div className="text-white/50 text-sm font-semibold">{stat.label}</div>
               </div>
             ))}
@@ -225,7 +225,7 @@ export default function Dashboard() {
           <section>
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-5 h-5 gold-accent" />
-              <h2 className="text-lg font-bold uppercase tracking-wider">Upcoming Games</h2>
+              <h2 className="text-lg font-bold uppercase tracking-wider font-display">Upcoming Games</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {upcomingGames.slice(0, 6).map((game) => (
@@ -240,7 +240,7 @@ export default function Dashboard() {
           <section>
             <div className="flex items-center gap-2 mb-4">
               <CheckCircle2 className="w-5 h-5" style={{ color: '#4CAF50' }} />
-              <h2 className="text-lg font-bold uppercase tracking-wider">Recent Results</h2>
+              <h2 className="text-lg font-bold uppercase tracking-wider font-display">Recent Results</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {recentResults.slice(0, 6).map((game) => (
@@ -255,7 +255,7 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
             <div className="flex items-center gap-2">
               <Target className="w-5 h-5 gold-accent" />
-              <h2 className="text-lg font-bold uppercase tracking-wider">Make Your Picks</h2>
+              <h2 className="text-lg font-bold uppercase tracking-wider font-display">Make Your Picks</h2>
             </div>
             <div className="flex gap-1 bg-muted/50 border border-border p-1 rounded-lg">
               {['all', 'live', 'upcoming', 'my-picks'].map((filter) => (
@@ -360,7 +360,7 @@ export default function Dashboard() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 gold-accent" />
-            <h2 className="text-lg font-bold uppercase tracking-wider">Leaderboard</h2>
+            <h2 className="text-lg font-bold uppercase tracking-wider font-display">Leaderboard</h2>
           </div>
           {leaderboard.length > 0 ? (
             <div className="glass-card rounded-xl overflow-hidden">

@@ -76,7 +76,7 @@ export default function RegisterPage() {
             height={120}
             className="h-28 w-auto mx-auto mb-4"
           />
-          <p className="text-muted-foreground">Create your account</p>
+          <p className="text-muted-foreground font-display">Create your account</p>
         </div>
 
         <div className="glass-card rounded-2xl p-8">

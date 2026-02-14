@@ -50,7 +50,7 @@ export default function LoginPage() {
             height={120}
             className="h-28 w-auto mx-auto mb-4"
           />
-          <p className="text-muted-foreground">Sign in to your account</p>
+          <p className="text-muted-foreground font-display">Sign in to your account</p>
         </div>
 
         <div className="glass-card rounded-2xl p-8">

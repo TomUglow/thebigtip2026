@@ -116,7 +116,7 @@ export default function LobbyPage() {
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-black tracking-tight">Contest Lobby</h1>
+        <h1 className="text-2xl font-black tracking-tight font-display">Contest Lobby</h1>
         <p className="text-sm text-muted-foreground">
           Enter the main competition or create your own private league.
         </p>
@@ -141,7 +141,7 @@ export default function LobbyPage() {
                   Free Entry
                 </span>
               </div>
-              <h2 className="text-xl font-black tracking-tight">
+              <h2 className="text-xl font-black tracking-tight font-display">
                 {mainCompetition.name}
               </h2>
               <p className="text-sm text-muted-foreground max-w-md">
@@ -208,7 +208,7 @@ export default function LobbyPage() {
       <section>
         <div className="flex items-center gap-2 mb-2 px-1">
           <Trophy className="w-4 h-4" style={{ color: '#FFD700' }} />
-          <h2 className="text-sm font-bold uppercase tracking-wider">
+          <h2 className="text-sm font-bold uppercase tracking-wider font-display">
             Competitions ({otherCompetitions.length})
           </h2>
         </div>
