@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { format, differenceInHours, differenceInMinutes, differenceInDays } from 'date-fns'
 import {
   Trophy, Target, TrendingUp, Calendar, CheckCircle2,
-  Circle, Users
+  Circle, Users, Plus, Clock,
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
-import type { ScoreGame, Event } from '@/lib/types'
+import type { ScoreGame, Competition } from '@/lib/types'
 
 function formatCountdown(eventDate: Date): string {
   const now = new Date()
@@ -78,20 +79,68 @@ function GameCard({ game }: { game: ScoreGame }) {
   )
 }
 
-interface LeaderboardEntry {
-  rank: number
-  user: { id: string; name: string | null; email: string }
-  score: number
+function CountdownTimer({ targetDate }: { targetDate: string }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date().getTime()
+      const target = new Date(targetDate).getTime()
+      const diff = target - now
+
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000),
+      })
+    }
+
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [targetDate])
+
+  const units = [
+    { value: timeLeft.days, label: 'DAYS' },
+    { value: timeLeft.hours, label: 'HRS' },
+    { value: timeLeft.minutes, label: 'MIN' },
+    { value: timeLeft.seconds, label: 'SEC' },
+  ]
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {units.map((unit, i) => (
+        <div key={unit.label} className="flex items-center gap-1.5">
+          <div className="flex flex-col items-center">
+            <div className="bg-primary/90 text-white text-lg font-black w-12 h-12 rounded-lg flex items-center justify-center tabular-nums font-display">
+              {String(unit.value).padStart(2, '0')}
+            </div>
+            <span className="text-[9px] text-muted-foreground font-bold mt-1">{unit.label}</span>
+          </div>
+          {i < units.length - 1 && (
+            <span className="text-xl font-black text-muted-foreground mb-4">:</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function Dashboard() {
   const { data: session } = useSession()
-  const [activeFilter, setActiveFilter] = useState('all')
-  const [events, setEvents] = useState<Event[]>([])
+  const router = useRouter()
+  const [competitions, setCompetitions] = useState<Competition[]>([])
   const [scores, setScores] = useState<ScoreGame[]>([])
   const [userPicks, setUserPicks] = useState<any[]>([])
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [userRank, setUserRank] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [joining, setJoining] = useState(false)
 
   useEffect(() => {
     if (session) {
@@ -106,38 +155,40 @@ export default function Dashboard() {
           fetch(url),
           new Promise<Response>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), timeout)
-          )
-        ]);
-      };
+          ),
+        ])
+      }
 
-      const [eventsRes, scoresRes, picksRes, compsRes] = await Promise.all([
-        fetchWithTimeout('/api/events').catch(() => ({ json: async () => [] })),
+      const [scoresRes, picksRes, compsRes] = await Promise.all([
         fetchWithTimeout('/api/scores').catch(() => ({ json: async () => [] })),
         fetchWithTimeout('/api/picks').catch(() => ({ json: async () => [] })),
         fetchWithTimeout('/api/competitions').catch(() => ({ json: async () => [] })),
       ])
 
-      const [eventsData, scoresData, picksData, compsData] = await Promise.all([
-        eventsRes.json(),
+      const [scoresData, picksData, compsData] = await Promise.all([
         scoresRes.json(),
         picksRes.json(),
         compsRes.json(),
       ])
 
-      setEvents(Array.isArray(eventsData) ? eventsData : [])
       setScores(Array.isArray(scoresData) ? scoresData : [])
       setUserPicks(Array.isArray(picksData) ? picksData : [])
 
-      // Fetch leaderboard for the first active public competition
       const comps = Array.isArray(compsData) ? compsData : []
-      const activeComp = comps.find((c: any) => c.isPublic && c.status === 'active') || comps[0]
-      if (activeComp) {
+      setCompetitions(comps)
+
+      // Get user rank from main competition leaderboard
+      const mainComp = comps.find((c: Competition) => c.isPublic && (c.status === 'active' || c.status === 'upcoming')) || comps[0]
+      if (mainComp) {
         try {
-          const lbRes = await fetchWithTimeout(`/api/leaderboard?competitionId=${activeComp.id}`)
+          const lbRes = await fetchWithTimeout(`/api/leaderboard?competitionId=${mainComp.id}`)
           const lbData = await lbRes.json()
-          setLeaderboard(Array.isArray(lbData) ? lbData : [])
+          if (Array.isArray(lbData)) {
+            const myEntry = lbData.find((e: any) => e.user.id === (session?.user as any)?.id)
+            if (myEntry) setUserRank(myEntry.rank)
+          }
         } catch {
-          // Leaderboard is non-critical
+          // Non-critical
         }
       }
     } catch (error) {
@@ -147,39 +198,40 @@ export default function Dashboard() {
     }
   }
 
-  const handlePickTeam = async (eventId: string, selectedTeam: string) => {
+  const handleEnterNow = async (competitionId: string) => {
+    setJoining(true)
     try {
-      const res = await fetch('/api/picks', {
+      const res = await fetch('/api/competitions/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, selectedTeam })
+        body: JSON.stringify({ competitionId }),
       })
-
       if (res.ok) {
-        await fetchData()
+        router.push(`/lobby/${competitionId}`)
       }
     } catch (error) {
-      console.error('Error saving pick:', error)
+      console.error('Error joining competition:', error)
+    } finally {
+      setJoining(false)
     }
   }
 
-  const getUserPick = (eventId: string) => {
-    const pick = userPicks.find(p => p.eventId === eventId)
-    return pick?.selectedTeam
-  }
+  const mainCompetition = competitions.find(
+    (c) => c.isPublic && (c.status === 'active' || c.status === 'upcoming')
+  ) || competitions.find((c) => c.isPublic)
 
-  const filteredEvents = events.filter(event => {
-    if (activeFilter === 'all') return true
-    if (activeFilter === 'live') return event.status === 'live'
-    if (activeFilter === 'upcoming') return event.status === 'upcoming'
-    if (activeFilter === 'my-picks') return getUserPick(event.id) !== undefined
-    return true
-  })
-
-  const upcomingGames = scores.filter(g => !g.completed)
-  const recentResults = scores.filter(g => g.completed && g.scores)
+  const joinedComps = competitions.filter((c) => c.isJoined)
   const userPicksCount = userPicks.length
-  const correctPicks = userPicks.filter(p => p.isCorrect).length
+  const correctPicks = userPicks.filter((p) => p.isCorrect).length
+  const upcomingGames = scores.filter((g) => !g.completed)
+  const recentResults = scores.filter((g) => g.completed && g.scores)
+
+  // Smart button state for main competition
+  const getMainButtonState = (comp: Competition) => {
+    if (!comp.isJoined) return 'enter'
+    if (comp.status === 'upcoming' || comp.status === 'active') return 'edit'
+    return 'leaderboard'
+  }
 
   if (loading) {
     return (
@@ -195,17 +247,29 @@ export default function Dashboard() {
       <div className="border-b border-white/10 py-12 px-6 relative">
         <div className="absolute inset-0 bg-black/30 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <h1 className="text-4xl font-black tracking-tight mb-2 text-white font-display">
-            G&apos;day, <span className="gold-accent">{session?.user?.name?.split(' ')[0] || 'Tipster'}</span>
-          </h1>
-          <p className="text-white/70 text-lg mb-8">Here&apos;s what&apos;s happening.</p>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+            <div>
+              <h1 className="text-4xl font-black tracking-tight mb-2 text-white font-display">
+                G&apos;day, <span className="gold-accent">{session?.user?.name?.split(' ')[0] || 'Tipster'}</span>
+              </h1>
+              <p className="text-white/70 text-lg">Here&apos;s what&apos;s happening.</p>
+            </div>
+            <button
+              disabled
+              className="glass-card px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 opacity-50 cursor-not-allowed"
+              title="Coming Soon"
+            >
+              <Plus className="w-4 h-4" />
+              Create Private League
+            </button>
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Your Picks', value: `${userPicksCount}/50`, icon: Target },
-              { label: 'Correct', value: correctPicks, icon: CheckCircle2 },
-              { label: 'Win Rate', value: userPicksCount > 0 ? `${Math.round((correctPicks / userPicksCount) * 100)}%` : '--', icon: TrendingUp },
-              { label: 'Rank', value: '--', icon: Trophy },
+              { label: 'MY COMPS', value: joinedComps.length, icon: Trophy },
+              { label: 'MAIN TIPS', value: `${userPicksCount}/50`, icon: Target },
+              { label: 'WIN RATE', value: userPicksCount > 0 ? `${Math.round((correctPicks / userPicksCount) * 100)}%` : '--', icon: TrendingUp },
+              { label: 'GLOBAL RANK', value: userRank || '--', icon: Users },
             ].map((stat, i) => (
               <div key={i} className="bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl p-6 hover-elevate cursor-default">
                 <stat.icon className="w-5 h-5 mb-2 gold-accent" />
@@ -220,7 +284,96 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
-        {/* Live & Upcoming Games */}
+        {/* Main Event Card */}
+        {mainCompetition && (
+          <section>
+            <div
+              className="glass-card rounded-xl overflow-hidden border-2 p-6"
+              style={{ borderColor: '#FFD700' }}
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div className="space-y-3 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="text-[10px] uppercase tracking-wider font-black px-2.5 py-0.5 rounded"
+                      style={{ backgroundColor: '#FFD700', color: '#000' }}
+                    >
+                      Main Event
+                    </span>
+                    {mainCompetition.entryFee === 0 && (
+                      <span className="text-[10px] px-2.5 py-0.5 rounded border border-border text-muted-foreground font-semibold">
+                        Free Entry
+                      </span>
+                    )}
+                  </div>
+
+                  <h2 className="text-2xl font-black tracking-tight font-display">
+                    {mainCompetition.name}
+                  </h2>
+
+                  {mainCompetition.description && (
+                    <p className="text-sm text-muted-foreground max-w-lg">
+                      {mainCompetition.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3" /> {mainCompetition.participantCount} tipsters
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Target className="w-3 h-3" /> {mainCompetition.eventCount} events
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-start lg:items-end gap-4">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold mb-2">
+                      <Clock className="w-3 h-3" /> TIPS CLOSE IN
+                    </div>
+                    <CountdownTimer targetDate={mainCompetition.startDate} />
+                  </div>
+
+                  {(() => {
+                    const state = getMainButtonState(mainCompetition)
+                    if (state === 'enter') {
+                      return (
+                        <button
+                          onClick={() => handleEnterNow(mainCompetition.id)}
+                          disabled={joining}
+                          className="brand-gradient text-white text-sm font-bold px-6 py-2.5 rounded-lg hover-elevate disabled:opacity-50"
+                        >
+                          {joining ? 'Entering...' : 'Enter Now'}
+                        </button>
+                      )
+                    }
+                    if (state === 'edit') {
+                      return (
+                        <button
+                          onClick={() => router.push(`/lobby/${mainCompetition.id}`)}
+                          className="brand-gradient text-white text-sm font-bold px-6 py-2.5 rounded-lg hover-elevate"
+                        >
+                          Edit Tips
+                        </button>
+                      )
+                    }
+                    return (
+                      <button
+                        onClick={() => router.push(`/lobby/${mainCompetition.id}`)}
+                        className="glass-card text-sm font-bold px-6 py-2.5 rounded-lg hover-elevate"
+                      >
+                        View Leaderboard
+                      </button>
+                    )
+                  })()}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Upcoming Games */}
         {upcomingGames.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-4">
@@ -249,199 +402,6 @@ export default function Dashboard() {
             </div>
           </section>
         )}
-
-        {/* Event Picks */}
-        <section>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 gold-accent" />
-              <h2 className="text-lg font-bold uppercase tracking-wider font-display">Make Your Picks</h2>
-            </div>
-            <div className="flex gap-1 bg-muted/50 border border-border p-1 rounded-lg">
-              {['all', 'live', 'upcoming', 'my-picks'].map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter)}
-                  className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${
-                    activeFilter === filter
-                      ? 'brand-gradient text-white shadow-sm'
-                      : 'text-foreground/70 hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  {filter === 'all' && 'All'}
-                  {filter === 'live' && 'Live'}
-                  {filter === 'upcoming' && 'Upcoming'}
-                  {filter === 'my-picks' && 'My Picks'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredEvents.map((event) => {
-              const userPick = getUserPick(event.id)
-              const sportColor = SPORT_COLORS[event.sport] || '#D32F2F'
-              const eventDate = new Date(event.eventDate)
-              const isUpcoming = event.status === 'upcoming'
-              const hasOptions = event.options && event.options.length > 0
-              const hasTeams = event.team1Name && event.team2Name
-
-              return (
-                <div key={event.id} className="glass-card rounded-xl p-4 hover-elevate space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      {event.eventNumber && (
-                        <span className="text-xs font-black text-muted-foreground">#{event.eventNumber}</span>
-                      )}
-                      <span
-                        className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide"
-                        style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
-                      >
-                        {event.sport}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground text-xs font-semibold">
-                      {isUpcoming ? formatCountdown(eventDate) : format(eventDate, 'MMM d')}
-                    </span>
-                  </div>
-
-                  {event.title && (
-                    <h3 className="text-sm font-bold leading-tight">{event.title}</h3>
-                  )}
-
-                  {hasOptions ? (
-                    <div className="space-y-2">
-                      <select
-                        value={userPick || ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handlePickTeam(event.id, e.target.value)
-                          }
-                        }}
-                        className="w-full p-3 rounded-lg border-2 bg-muted/30 border-border text-sm font-semibold appearance-none cursor-pointer hover:border-foreground/30 transition-all focus:outline-none focus:border-primary"
-                        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23999\' stroke-width=\'2\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-                      >
-                        <option value="">Select your pick...</option>
-                        {event.options!.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : hasTeams ? (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => handlePickTeam(event.id, 'team1')}
-                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
-                          userPick === 'team1'
-                            ? 'bg-primary/15 border-primary'
-                            : 'bg-muted/30 border-border hover:border-foreground/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
-                            {event.team1Abbr}
-                          </div>
-                          <span className="font-semibold text-sm">{event.team1Name}</span>
-                        </div>
-                        <span className="gold-accent font-bold text-sm">{event.team1Odds || 'TBD'}</span>
-                      </button>
-
-                      <button
-                        onClick={() => handlePickTeam(event.id, 'team2')}
-                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
-                          userPick === 'team2'
-                            ? 'bg-primary/15 border-primary'
-                            : 'bg-muted/30 border-border hover:border-foreground/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
-                            {event.team2Abbr}
-                          </div>
-                          <span className="font-semibold text-sm">{event.team2Name}</span>
-                        </div>
-                        <span className="gold-accent font-bold text-sm">{event.team2Odds || 'TBD'}</span>
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {userPick ? (
-                    <div className="p-3 rounded-lg font-semibold text-sm text-center bg-green-500/15 border border-green-500/40 text-green-500">
-                      Pick Locked: {userPick}
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-lg font-semibold text-sm text-center bg-yellow-500/15 border border-yellow-500/40">
-                      <span className="gold-accent">Make Your Pick</span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {filteredEvents.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground glass-card rounded-xl">
-              <p className="text-sm">No events found for this filter.</p>
-              <p className="text-xs mt-2">Check back later for upcoming events!</p>
-            </div>
-          )}
-        </section>
-
-                {/* Leaderboard */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 gold-accent" />
-            <h2 className="text-lg font-bold uppercase tracking-wider font-display">Leaderboard</h2>
-          </div>
-          {leaderboard.length > 0 ? (
-            <div className="glass-card rounded-xl overflow-hidden">
-              <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">
-                <div className="w-10 text-center">#</div>
-                <div className="flex-1">Tipster</div>
-                <div className="w-20 text-center">Score</div>
-              </div>
-              {leaderboard.slice(0, 10).map((entry) => {
-                const isCurrentUser = (session?.user as any)?.id === entry.user.id
-                return (
-                  <div
-                    key={entry.user.id}
-                    className={`flex items-center gap-4 px-4 py-3 border-b border-border last:border-b-0 transition-colors ${
-                      isCurrentUser ? 'bg-primary/10' : ''
-                    }`}
-                  >
-                    <div className="w-10 text-center">
-                      {entry.rank <= 3 ? (
-                        <span className={`text-sm font-black ${entry.rank === 1 ? 'gold-accent' : 'text-muted-foreground'}`}>
-                          {entry.rank}
-                        </span>
-                      ) : (
-                        <span className="text-sm font-semibold text-muted-foreground">{entry.rank}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-7 h-7 brand-gradient rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                        {entry.user.name?.[0]?.toUpperCase() || 'U'}
-                      </div>
-                      <span className={`text-sm truncate ${isCurrentUser ? 'font-bold' : 'font-medium'}`}>
-                        {entry.user.name || entry.user.email}
-                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">(you)</span>}
-                      </span>
-                    </div>
-                    <div className="w-20 text-center">
-                      <span className="text-sm font-bold tabular-nums">{entry.score}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground glass-card rounded-xl">
-              <Trophy className="w-8 h-8 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No leaderboard data yet.</p>
-              <p className="text-xs mt-1">Join a competition to see rankings!</p>
-            </div>
-          )}
-        </section>
       </div>
     </>
   )

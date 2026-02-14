@@ -17,7 +17,7 @@
   --card: 220 18% 10%;
   --card-foreground: 210 20% 92%;
 
-  --border: 220 12% 17%;
+  --border: 0 0% 96%;
 }
 
 :root.light {

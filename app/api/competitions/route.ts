@@ -29,10 +29,21 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Check which competitions the current user has joined
+    const joinedCompIds = new Set<string>()
+    if (session?.user) {
+      const memberships = await prisma.competitionUser.findMany({
+        where: { userId: (session.user as any).id },
+        select: { competitionId: true },
+      })
+      memberships.forEach((m) => joinedCompIds.add(m.competitionId))
+    }
+
     const result = competitions.map((comp) => ({
       ...comp,
       participantCount: comp._count.users,
       eventCount: comp._count.events,
+      isJoined: joinedCompIds.has(comp.id),
     }))
 
     return NextResponse.json(result)

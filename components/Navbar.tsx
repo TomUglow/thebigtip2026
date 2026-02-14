@@ -38,7 +38,7 @@ export default function Navbar() {
           {session && (
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => {
-                const isActive = pathname === link.href
+                const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href)
                 return (
                   <Link
                     key={link.href}
@@ -96,7 +96,7 @@ export default function Navbar() {
         <div className="md:hidden border-t border-border bg-card/95 backdrop-blur-xl">
           <div className="px-4 py-3 space-y-1">
             {navLinks.map((link) => {
-              const isActive = pathname === link.href
+              const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href)
               return (
                 <Link
                   key={link.href}
