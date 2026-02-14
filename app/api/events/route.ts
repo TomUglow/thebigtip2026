@@ -25,9 +25,10 @@ export async function GET(request: Request) {
 
     const events = await prisma.event.findMany({
       where: whereClause,
-      orderBy: {
-        eventDate: 'asc'
-      },
+      orderBy: [
+        { eventNumber: 'asc' },
+        { eventDate: 'asc' },
+      ],
       include: {
         picks: true,
         competitions: {

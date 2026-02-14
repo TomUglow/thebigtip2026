@@ -283,60 +283,91 @@ export default function Dashboard() {
               const sportColor = SPORT_COLORS[event.sport] || '#D32F2F'
               const eventDate = new Date(event.eventDate)
               const isUpcoming = event.status === 'upcoming'
+              const hasOptions = event.options && event.options.length > 0
+              const hasTeams = event.team1Name && event.team2Name
 
               return (
                 <div key={event.id} className="glass-card rounded-xl p-4 hover-elevate space-y-3">
                   <div className="flex justify-between items-start">
-                    <span
-                      className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide"
-                      style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
-                    >
-                      {event.sport}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {event.eventNumber && (
+                        <span className="text-xs font-black text-muted-foreground">#{event.eventNumber}</span>
+                      )}
+                      <span
+                        className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide"
+                        style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
+                      >
+                        {event.sport}
+                      </span>
+                    </div>
                     <span className="text-muted-foreground text-xs font-semibold">
                       {isUpcoming ? formatCountdown(eventDate) : format(eventDate, 'MMM d')}
                     </span>
                   </div>
 
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => handlePickTeam(event.id, 'team1')}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
-                        userPick === 'team1'
-                          ? 'bg-primary/15 border-primary'
-                          : 'bg-muted/30 border-border hover:border-foreground/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
-                          {event.team1Abbr}
-                        </div>
-                        <span className="font-semibold text-sm">{event.team1Name}</span>
-                      </div>
-                      <span className="gold-accent font-bold text-sm">{event.team1Odds || 'TBD'}</span>
-                    </button>
+                  {event.title && (
+                    <h3 className="text-sm font-bold leading-tight">{event.title}</h3>
+                  )}
 
-                    <button
-                      onClick={() => handlePickTeam(event.id, 'team2')}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
-                        userPick === 'team2'
-                          ? 'bg-primary/15 border-primary'
-                          : 'bg-muted/30 border-border hover:border-foreground/30'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
-                          {event.team2Abbr}
+                  {hasOptions ? (
+                    <div className="space-y-2">
+                      <select
+                        value={userPick || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handlePickTeam(event.id, e.target.value)
+                          }
+                        }}
+                        className="w-full p-3 rounded-lg border-2 bg-muted/30 border-border text-sm font-semibold appearance-none cursor-pointer hover:border-foreground/30 transition-all focus:outline-none focus:border-primary"
+                        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23999\' stroke-width=\'2\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                      >
+                        <option value="">Select your pick...</option>
+                        {event.options!.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : hasTeams ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handlePickTeam(event.id, 'team1')}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
+                          userPick === 'team1'
+                            ? 'bg-primary/15 border-primary'
+                            : 'bg-muted/30 border-border hover:border-foreground/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
+                            {event.team1Abbr}
+                          </div>
+                          <span className="font-semibold text-sm">{event.team1Name}</span>
                         </div>
-                        <span className="font-semibold text-sm">{event.team2Name}</span>
-                      </div>
-                      <span className="gold-accent font-bold text-sm">{event.team2Odds || 'TBD'}</span>
-                    </button>
-                  </div>
+                        <span className="gold-accent font-bold text-sm">{event.team1Odds || 'TBD'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handlePickTeam(event.id, 'team2')}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
+                          userPick === 'team2'
+                            ? 'bg-primary/15 border-primary'
+                            : 'bg-muted/30 border-border hover:border-foreground/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-muted rounded-md flex items-center justify-center text-xs font-bold">
+                            {event.team2Abbr}
+                          </div>
+                          <span className="font-semibold text-sm">{event.team2Name}</span>
+                        </div>
+                        <span className="gold-accent font-bold text-sm">{event.team2Odds || 'TBD'}</span>
+                      </button>
+                    </div>
+                  ) : null}
 
                   {userPick ? (
                     <div className="p-3 rounded-lg font-semibold text-sm text-center bg-green-500/15 border border-green-500/40 text-green-500">
-                      Pick Locked: {userPick === 'team1' ? event.team1Abbr : event.team2Abbr}
+                      Pick Locked: {userPick}
                     </div>
                   ) : (
                     <div className="p-3 rounded-lg font-semibold text-sm text-center bg-yellow-500/15 border border-yellow-500/40">

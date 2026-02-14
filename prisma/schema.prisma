@@ -54,12 +54,15 @@ model CompetitionUser {
 
 model Event {
   id           String             @id @default(cuid())
+  eventNumber  Int?
+  title        String?
   sport        String
-  team1Name    String
-  team1Abbr    String
+  options      Json?
+  team1Name    String?
+  team1Abbr    String?
   team1Odds    String?
-  team2Name    String
-  team2Abbr    String
+  team2Name    String?
+  team2Abbr    String?
   team2Odds    String?
   eventDate    DateTime
   status       String             @default("upcoming")
