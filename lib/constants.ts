@@ -9,7 +9,6 @@ export const SPORT_COLORS: Record<string, string> = {
   Soccer: '#6A1B9A',
   'Premier League': '#6A1B9A',
   Motorsport: '#00C853',
-  NRL: '#FF4D4D',
   'Rugby Union': '#1A237E',
   Netball: '#D4AF37',
   Cricket: '#33691E',
