@@ -159,37 +159,22 @@ export default function Dashboard() {
         ])
       }
 
-      const [scoresRes, picksRes, compsRes] = await Promise.all([
+      const [dashboardRes, scoresRes] = await Promise.all([
+        fetchWithTimeout('/api/dashboard').catch(() => ({ ok: false, json: async () => ({}) })),
         fetchWithTimeout('/api/scores').catch(() => ({ json: async () => [] })),
-        fetchWithTimeout('/api/picks').catch(() => ({ json: async () => [] })),
-        fetchWithTimeout('/api/competitions').catch(() => ({ json: async () => [] })),
       ])
 
-      const [scoresData, picksData, compsData] = await Promise.all([
+      const [dashboardData, scoresData] = await Promise.all([
+        dashboardRes.json(),
         scoresRes.json(),
-        picksRes.json(),
-        compsRes.json(),
       ])
 
       setScores(Array.isArray(scoresData) ? scoresData : [])
-      setUserPicks(Array.isArray(picksData) ? picksData : [])
 
-      const comps = Array.isArray(compsData) ? compsData : []
-      setCompetitions(comps)
-
-      // Get user rank from main competition leaderboard
-      const mainComp = comps.find((c: Competition) => c.isPublic && (c.status === 'active' || c.status === 'upcoming')) || comps[0]
-      if (mainComp) {
-        try {
-          const lbRes = await fetchWithTimeout(`/api/leaderboard?competitionId=${mainComp.id}`)
-          const lbData = await lbRes.json()
-          if (Array.isArray(lbData)) {
-            const myEntry = lbData.find((e: any) => e.user.id === (session?.user as any)?.id)
-            if (myEntry) setUserRank(myEntry.rank)
-          }
-        } catch {
-          // Non-critical
-        }
+      if ((dashboardRes as Response).ok !== false) {
+        setCompetitions(Array.isArray(dashboardData.competitions) ? dashboardData.competitions : [])
+        setUserPicks(Array.isArray(dashboardData.userPicks) ? dashboardData.userPicks : [])
+        setUserRank(dashboardData.userRank ?? null)
       }
     } catch (error) {
       console.error('Error fetching data:', error)

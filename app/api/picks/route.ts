@@ -12,13 +12,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const competitionId = searchParams.get('competitionId')
+
+    let whereClause: any = { userId: session.user.id }
+
+    if (competitionId) {
+      // Only return picks for events in this competition
+      const competitionEvents = await prisma.competitionEvent.findMany({
+        where: { competitionId },
+        select: { eventId: true },
+      })
+      whereClause.eventId = { in: competitionEvents.map((ce) => ce.eventId) }
+    }
+
     const picks = await prisma.pick.findMany({
-      where: {
-        userId: session.user.id
+      where: whereClause,
+      select: {
+        id: true,
+        eventId: true,
+        selectedTeam: true,
+        isCorrect: true,
+        points: true,
+        createdAt: true,
+        updatedAt: true,
       },
-      include: {
-        event: true
-      }
     })
 
     return NextResponse.json(picks)
@@ -61,9 +79,6 @@ export async function POST(request: Request) {
         data: {
           selectedTeam: selectedTeam
         },
-        include: {
-          event: true
-        }
       })
     } else {
       // Create new pick
@@ -73,9 +88,6 @@ export async function POST(request: Request) {
           eventId: eventId,
           selectedTeam: selectedTeam
         },
-        include: {
-          event: true
-        }
       })
     }
 

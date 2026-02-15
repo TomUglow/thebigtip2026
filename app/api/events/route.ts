@@ -29,14 +29,6 @@ export async function GET(request: Request) {
         { eventNumber: 'asc' },
         { eventDate: 'asc' },
       ],
-      include: {
-        picks: true,
-        competitions: {
-          include: {
-            competition: true
-          }
-        }
-      }
     })
 
     return NextResponse.json(events)

@@ -6,10 +6,18 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import {
-  ArrowLeft, Search, CheckCircle2, Target, Users, Trophy, Filter,
+  ArrowLeft, CheckCircle2, Target, Trophy, Filter,
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type { Event, Competition, LeaderboardEntry } from '@/lib/types'
+
+interface UserPick {
+  id: string
+  eventId: string
+  selectedTeam: string
+  isCorrect: boolean | null
+  points: number
+}
 
 export default function CompetitionDetailPage() {
   const { data: session } = useSession()
@@ -18,7 +26,7 @@ export default function CompetitionDetailPage() {
 
   const [competition, setCompetition] = useState<Competition | null>(null)
   const [events, setEvents] = useState<Event[]>([])
-  const [userPicks, setUserPicks] = useState<any[]>([])
+  const [userPicks, setUserPicks] = useState<UserPick[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [activeTab, setActiveTab] = useState<'tips' | 'leaderboard'>('tips')
   const [sportFilter, setSportFilter] = useState('All')
@@ -33,29 +41,32 @@ export default function CompetitionDetailPage() {
 
   const fetchData = async () => {
     try {
-      const [compRes, eventsRes, picksRes, lbRes] = await Promise.all([
-        fetch(`/api/competitions/${competitionId}`),
-        fetch(`/api/events?competitionId=${competitionId}`),
-        fetch('/api/picks'),
-        fetch(`/api/leaderboard?competitionId=${competitionId}`),
-      ])
-
-      const [compData, eventsData, picksData, lbData] = await Promise.all([
-        compRes.json(),
-        eventsRes.json(),
-        picksRes.json(),
-        lbRes.json(),
-      ])
-
-      if (!compRes.ok) {
+      const res = await fetch(`/api/competitions/${competitionId}`)
+      if (!res.ok) {
         console.error('Competition not found')
         return
       }
+      const data = await res.json()
 
-      setCompetition(compData)
-      setEvents(Array.isArray(eventsData) ? eventsData : [])
-      setUserPicks(Array.isArray(picksData) ? picksData : [])
-      setLeaderboard(Array.isArray(lbData) ? lbData : [])
+      setCompetition({
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        entryFee: data.entryFee,
+        prizePool: data.prizePool,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        isPublic: data.isPublic,
+        maxEvents: data.maxEvents,
+        status: data.status,
+        participantCount: data.participantCount,
+        eventCount: data.eventCount,
+        isJoined: data.isJoined,
+        owner: data.owner,
+      })
+      setEvents(Array.isArray(data.events) ? data.events : [])
+      setUserPicks(Array.isArray(data.userPicks) ? data.userPicks : [])
+      setLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : [])
     } catch (error) {
       console.error('Error fetching competition data:', error)
     } finally {
@@ -65,17 +76,44 @@ export default function CompetitionDetailPage() {
 
   const handlePickTeam = async (eventId: string, selectedTeam: string) => {
     if (!selectedTeam) return
+
+    // Optimistic update
+    const previousPicks = [...userPicks]
+    const existingIdx = userPicks.findIndex((p) => p.eventId === eventId)
+    if (existingIdx >= 0) {
+      setUserPicks((prev) =>
+        prev.map((p) => (p.eventId === eventId ? { ...p, selectedTeam } : p))
+      )
+    } else {
+      setUserPicks((prev) => [
+        ...prev,
+        { id: `temp-${eventId}`, eventId, selectedTeam, isCorrect: null, points: 0 },
+      ])
+    }
+
     try {
       const res = await fetch('/api/picks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventId, selectedTeam }),
       })
-      if (res.ok) {
-        await fetchData()
+      if (!res.ok) {
+        // Revert on failure
+        setUserPicks(previousPicks)
+      } else {
+        // Update with server-assigned ID
+        const savedPick = await res.json()
+        setUserPicks((prev) =>
+          prev.map((p) =>
+            p.eventId === eventId
+              ? { ...p, id: savedPick.id, selectedTeam: savedPick.selectedTeam }
+              : p
+          )
+        )
       }
     } catch (error) {
       console.error('Error saving pick:', error)
+      setUserPicks(previousPicks)
     }
   }
 
