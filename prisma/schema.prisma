@@ -8,16 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String            @id @default(cuid())
-  email        String            @unique
-  name         String?
-  password     String
-  avatar       String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  ownedComps   Competition[]     @relation("CompetitionOwner")
-  competitions CompetitionUser[]
-  picks        Pick[]
+  id               String            @id @default(cuid())
+  email            String            @unique
+  username         String            @unique
+  name             String?
+  password         String
+  avatar           String?
+  mobile           String?
+  postcode         String?
+  profileCompleted Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  ownedComps       Competition[]     @relation("CompetitionOwner")
+  competitions     CompetitionUser[]
+  picks            Pick[]
+  favoriteTeams    FavoriteTeam[]
 }
 
 model Competition {
@@ -98,4 +103,16 @@ model Pick {
   user         User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, eventId])
+}
+
+model FavoriteTeam {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sport     String
+  team      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, sport, team])
+  @@index([userId])
 }

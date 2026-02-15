@@ -6,11 +6,27 @@ import bcrypt from 'bcryptjs'
 declare module 'next-auth' {
   interface User {
     id: string
+    username?: string
+    mobile?: string | null
+    avatar?: string | null
   }
   interface Session {
     user: User & {
       id: string
+      email: string
+      username: string
+      mobile?: string | null
+      avatar?: string | null
     }
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string
+    username: string
+    mobile?: string | null
+    avatar?: string | null
   }
 }
 
@@ -50,6 +66,9 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
+          username: user.username,
+          mobile: user.mobile,
+          avatar: user.avatar,
         }
       }
     })
@@ -66,6 +85,9 @@ export const authOptions: NextAuthOptions = {
         return {
           ...token,
           id: user.id,
+          username: user.username,
+          mobile: user.mobile,
+          avatar: user.avatar,
         }
       }
       return token
@@ -76,6 +98,9 @@ export const authOptions: NextAuthOptions = {
         user: {
           ...session.user,
           id: token.id,
+          username: token.username,
+          mobile: token.mobile,
+          avatar: token.avatar,
         }
       }
     }

@@ -8,7 +8,6 @@ import { format } from 'date-fns'
 import { ArrowLeft, Target, Check, Filter } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type {Event, Competition} from '@/lib/types'
-import MainEventCard from '@/components/MainEventCard'
 
 export default function CreateLeaguePage() {
   const { data: session } = useSession()
@@ -134,11 +133,6 @@ export default function CreateLeaguePage() {
         <p className="text-sm text-muted-foreground mt-1">
           Set up a competition for you and your mates.
         </p>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <MainEventCard />
       </div>
 
       {/* Competition details form */}
