@@ -8,6 +8,7 @@ import {
   Lock, Globe, Target, Plus,
 } from 'lucide-react'
 import type { Competition } from '@/lib/types'
+import MainEventCard from '@/components/MainEventCard'
 
 function CompetitionRow({ competition }: { competition: Competition }) {
   return (
@@ -129,6 +130,8 @@ export default function LobbyPage() {
           Create League
         </Link>
       </div>
+
+      <MainEventCard competitions={competitions} />
 
       {/* Join Private Code */}
       <div className="glass-card rounded-xl">
