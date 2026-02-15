@@ -12,6 +12,8 @@ import { SPORT_COLORS } from '@/lib/constants'
 import type { ScoreGame, Competition } from '@/lib/types'
 import MainEventCard from '@/components/MainEventCard'
 
+export const dynamic = 'force-dynamic'
+
 function formatCountdown(eventDate: Date): string {
   const now = new Date()
   const days = differenceInDays(eventDate, now)
