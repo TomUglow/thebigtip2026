@@ -50,7 +50,7 @@
 
 @layer components {
   .brand-gradient {
-    background: linear-gradient(135deg, #D32F2F 0%, #8B1010 100%);
+    background: linear-gradient(30deg, #8C322B 0%, #8B1010 70%);
   }
 
   .text-gradient {
