@@ -1,7 +1,10 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
+
+export const dynamic = 'force-dynamic'
 
 export async function DELETE(
   request: NextRequest,
@@ -9,36 +12,25 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     // Delete team (ensure it belongs to the user)
     const team = await prisma.favoriteTeam.findUnique({
       where: { id: params.id },
     })
 
-    if (!team || team.userId !== user.id) {
-      return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+    if (!team || team.userId !== userId) {
+      return apiError('Team not found', 404)
     }
 
     await prisma.favoriteTeam.delete({
       where: { id: params.id },
     })
 
-    return NextResponse.json({ message: 'Team removed' })
+    return apiSuccess({ message: 'Team removed' })
   } catch (error) {
     console.error('Error deleting team:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500)
   }
 }

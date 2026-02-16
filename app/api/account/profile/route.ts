@@ -1,31 +1,20 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
+import { updateProfileSchema } from '@/lib/validations'
+import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
 
-const updateProfileSchema = z.object({
-  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/).optional(),
-  email: z.string().email().optional(),
-  name: z.string().optional(),
-  mobile: z.string().optional(),
-  postcode: z.string().optional(),
-})
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-
-    console.log('Profile GET session:', session)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const email = session.user.email?.toLowerCase()
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { id: userId },
       select: {
         username: true,
         email: true,
@@ -38,39 +27,40 @@ export async function GET() {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return apiError('User not found', 404)
     }
 
-    return NextResponse.json(user)
+    return apiSuccess(user)
   } catch (error) {
-    console.error('Error fetching profile - Full error:', error)
-    return NextResponse.json({ error: 'Internal server error', detail: String(error) }, { status: 500 })
+    console.error('Error fetching profile:', error)
+    return apiError('Internal server error', 500)
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    console.log('Profile PATCH session:', session)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     const body = await request.json()
-    console.log('Profile PATCH body:', body)
 
     // Validate input
-    const data = updateProfileSchema.parse(body)
+    const result = updateProfileSchema.safeParse(body)
+    if (!result.success) {
+      console.error('Profile validation error:', result.error.errors)
+      return apiError('Invalid input', 400)
+    }
+
+    const data = result.data
 
     // Check if new email/username already exists
     if (data.email) {
       const existingEmail = await prisma.user.findUnique({
         where: { email: data.email.toLowerCase() },
       })
-      if (existingEmail && existingEmail.email !== session.user.email) {
-        return NextResponse.json({ error: 'Email already taken' }, { status: 409 })
+      if (existingEmail && existingEmail.id !== userId) {
+        return apiError('Email already taken', 409)
       }
     }
 
@@ -78,8 +68,8 @@ export async function PATCH(request: NextRequest) {
       const existingUsername = await prisma.user.findUnique({
         where: { username: data.username.toLowerCase() },
       })
-      if (existingUsername && existingUsername.username !== (session.user as any).username) {
-        return NextResponse.json({ error: 'Username already taken' }, { status: 409 })
+      if (existingUsername && existingUsername.id !== userId) {
+        return apiError('Username already taken', 409)
       }
     }
 
@@ -92,7 +82,7 @@ export async function PATCH(request: NextRequest) {
     if (data.postcode !== undefined) updateData.postcode = data.postcode || null
 
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email.toLowerCase() },
+      where: { id: userId },
       data: updateData,
       select: {
         username: true,
@@ -104,12 +94,9 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(updatedUser)
-  } catch (error: any) {
+    return apiSuccess(updatedUser)
+  } catch (error) {
     console.error('Error updating profile:', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500)
   }
 }

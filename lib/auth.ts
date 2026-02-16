@@ -45,7 +45,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: {
-            email: credentials.email
+            email: credentials.email.toLowerCase()
           }
         })
 
@@ -88,7 +88,7 @@ export const authOptions: NextAuthOptions = {
           username: user.username || '',
           mobile: user.mobile,
           avatar: user.avatar,
-        } as any
+        }
       }
       return token
     },

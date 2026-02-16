@@ -1,41 +1,23 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { z } from 'zod'
+import { registerSchema } from '@/lib/validations'
+import { apiError, apiSuccess } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
-
-// Validation schema
-const registerSchema = z.object({
-  username: z
-    .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(20, 'Username must be at most 20 characters')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().optional(),
-  mobile: z.string().optional(),
-  postcode: z.string().optional(),
-  favoriteTeams: z.array(z.object({ sport: z.string(), team: z.string() })).optional(),
-})
-
-type RegisterInput = z.infer<typeof registerSchema>
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
 
     // Validate input
-    let data: RegisterInput
-    try {
-      data = registerSchema.parse(body)
-    } catch (validationError: any) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validationError.errors },
-        { status: 400 }
-      )
+    const result = registerSchema.safeParse(body)
+    if (!result.success) {
+      console.error('Validation error:', result.error.errors)
+      return apiError('Validation failed', 400)
     }
+
+    const data = result.data
 
     // Check if email already exists
     const existingEmail = await prisma.user.findUnique({
@@ -43,10 +25,7 @@ export async function POST(request: Request) {
     })
 
     if (existingEmail) {
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
-      )
+      return apiError('An account with this email already exists', 409)
     }
 
     // Check if username already exists
@@ -55,10 +34,7 @@ export async function POST(request: Request) {
     })
 
     if (existingUsername) {
-      return NextResponse.json(
-        { error: 'Username is already taken' },
-        { status: 409 }
-      )
+      return apiError('Username is already taken', 409)
     }
 
     // Hash password
@@ -86,21 +62,15 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json(
-      {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        name: user.name,
-      },
-      { status: 201 }
-    )
-  } catch (error: any) {
+    return apiSuccess({
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      name: user.name,
+    }, 201)
+  } catch (error) {
     console.error('Registration error:', error)
-    return NextResponse.json(
-      { error: 'Something went wrong', detail: error?.message || String(error) },
-      { status: 500 }
-    )
+    return apiError('Something went wrong', 500)
   }
 }
 

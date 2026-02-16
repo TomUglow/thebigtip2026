@@ -1,19 +1,20 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     // Mark profile as completed
     const user = await prisma.user.update({
-      where: { email: session.user.email.toLowerCase() },
+      where: { id: userId },
       data: { profileCompleted: true },
       select: {
         id: true,
@@ -24,12 +25,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json(user)
+    return apiSuccess(user)
   } catch (error) {
     console.error('Error completing profile:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError('Internal server error', 500)
   }
 }

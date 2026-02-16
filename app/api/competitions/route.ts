@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
+import { competitionCreateSchema } from '@/lib/validations'
+import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +15,8 @@ export async function GET(request: Request) {
       where: {
         OR: [
           { isPublic: true },
-          ...(session?.user
-            ? [{ users: { some: { userId: (session.user as any).id } } }]
+          ...(session?.user?.id
+            ? [{ users: { some: { userId: session.user.id } } }]
             : []),
         ],
       },
@@ -31,9 +33,9 @@ export async function GET(request: Request) {
 
     // Check which competitions the current user has joined
     const joinedCompIds = new Set<string>()
-    if (session?.user) {
+    if (session?.user?.id) {
       const memberships = await prisma.competitionUser.findMany({
-        where: { userId: (session.user as any).id },
+        where: { userId: session.user.id },
         select: { competitionId: true },
       })
       memberships.forEach((m) => joinedCompIds.add(m.competitionId))
@@ -49,46 +51,26 @@ export async function GET(request: Request) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching competitions:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch competitions' },
-      { status: 500 }
-    )
+    return apiError('Failed to fetch competitions', 500)
   }
 }
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     const body = await request.json()
-    const { name, description, startDate, eventIds } = body
 
-    // Validate required fields
-    const trimmedName = typeof name === 'string' ? name.trim() : ''
-    if (!trimmedName || trimmedName.length > 100) {
-      return NextResponse.json(
-        { error: 'Name is required and must be 100 characters or less' },
-        { status: 400 }
-      )
+    // Validate input
+    const result = competitionCreateSchema.safeParse(body)
+    if (!result.success) {
+      console.error('Competition validation error:', result.error.errors)
+      return apiError('Invalid competition data', 400)
     }
 
-    if (!Array.isArray(eventIds) || eventIds.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one event must be selected' },
-        { status: 400 }
-      )
-    }
-
-    const parsedStartDate = new Date(startDate)
-    if (isNaN(parsedStartDate.getTime()) || parsedStartDate <= new Date()) {
-      return NextResponse.json(
-        { error: 'Tips close date must be a valid future date' },
-        { status: 400 }
-      )
-    }
+    const { name, description, startDate, eventIds } = result.data
 
     // Verify all events exist and haven't completed
     const validEvents = await prisma.event.findMany({
@@ -101,28 +83,27 @@ export async function POST(request: Request) {
     })
 
     if (validEvents.length !== eventIds.length) {
-      return NextResponse.json(
-        { error: 'Some selected events are invalid or already completed' },
-        { status: 400 }
-      )
+      return apiError('Some selected events are invalid or already completed', 400)
     }
 
     // endDate = latest event date
     const endDate = validEvents[0].eventDate
 
+    const parsedStartDate = new Date(startDate)
+    if (isNaN(parsedStartDate.getTime()) || parsedStartDate <= new Date()) {
+      return apiError('Tips close date must be a valid future date', 400)
+    }
+
     if (parsedStartDate > endDate) {
-      return NextResponse.json(
-        { error: 'Tips close date must be before the last event date' },
-        { status: 400 }
-      )
+      return apiError('Tips close date must be before the last event date', 400)
     }
 
     // Create competition, link events, and auto-join creator in a transaction
     const competition = await prisma.$transaction(async (tx) => {
       const comp = await tx.competition.create({
         data: {
-          name: trimmedName,
-          description: typeof description === 'string' ? description.trim() || null : null,
+          name: name.trim(),
+          description: description?.trim() || null,
           entryFee: 0,
           prizePool: 0,
           startDate: parsedStartDate,
@@ -130,7 +111,7 @@ export async function POST(request: Request) {
           isPublic: false,
           maxEvents: eventIds.length,
           status: 'upcoming',
-          ownerId: session.user.id,
+          ownerId: userId,
         },
       })
 
@@ -143,7 +124,7 @@ export async function POST(request: Request) {
 
       await tx.competitionUser.create({
         data: {
-          userId: session.user.id,
+          userId,
           competitionId: comp.id,
         },
       })
@@ -151,15 +132,12 @@ export async function POST(request: Request) {
       return comp
     })
 
-    return NextResponse.json(
+    return apiSuccess(
       { success: true, competitionId: competition.id },
-      { status: 201 }
+      201
     )
   } catch (error) {
     console.error('Error creating competition:', error)
-    return NextResponse.json(
-      { error: 'Failed to create competition' },
-      { status: 500 }
-    )
+    return apiError('Failed to create competition', 500)
   }
 }

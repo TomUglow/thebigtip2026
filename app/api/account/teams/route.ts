@@ -1,26 +1,20 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
+import { teamSchema } from '@/lib/validations'
+import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
 
-const teamSchema = z.object({
-  sport: z.string().min(1),
-  team: z.string().min(1),
-})
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     const teams = await prisma.favoriteTeam.findMany({
-      where: {
-        user: { email: session.user.email.toLowerCase() },
-      },
+      where: { userId },
       select: {
         id: true,
         sport: true,
@@ -28,37 +22,34 @@ export async function GET() {
       },
     })
 
-    return NextResponse.json({ teams })
+    return apiSuccess({ teams })
   } catch (error) {
     console.error('Error fetching teams:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const userId = requireAuth(session)
+    if (userId instanceof Response) return userId
 
     const body = await request.json()
-    const data = teamSchema.parse(body)
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email.toLowerCase() },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    // Validate input
+    const result = teamSchema.safeParse(body)
+    if (!result.success) {
+      console.error('Team validation error:', result.error.errors)
+      return apiError('Invalid input', 400)
     }
+
+    const data = result.data
 
     // Create favorite team
     await prisma.favoriteTeam.create({
       data: {
-        userId: user.id,
+        userId,
         sport: data.sport,
         team: data.team,
       },
@@ -66,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Return all teams
     const teams = await prisma.favoriteTeam.findMany({
-      where: { userId: user.id },
+      where: { userId },
       select: {
         id: true,
         sport: true,
@@ -74,18 +65,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ teams })
+    return apiSuccess({ teams }, 201)
   } catch (error: any) {
     console.error('Error adding team:', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
-    }
     if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'This team is already in your favorites' },
-        { status: 409 }
-      )
+      return apiError('This team is already in your favorites', 409)
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500)
   }
 }

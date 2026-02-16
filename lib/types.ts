@@ -48,3 +48,62 @@ export interface LeaderboardEntry {
   user: { id: string; name: string | null; email: string; avatar: string | null }
   score: number
 }
+
+/**
+ * User's pick/prediction on an event
+ */
+export interface Pick {
+  id: string
+  eventId: string
+  selectedTeam: string
+  isCorrect: boolean | null
+  points: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * User profile information
+ */
+export interface UserProfile {
+  username: string
+  email: string
+  name: string | null
+  mobile: string | null
+  postcode: string | null
+  avatar: string | null
+  profileCompleted: boolean
+}
+
+/**
+ * User's favorite team
+ */
+export interface FavoriteTeam {
+  id: string
+  sport: string
+  team: string
+}
+
+/**
+ * Competition with leaderboard and event details
+ */
+export interface CompetitionDetail extends Competition {
+  events: Event[]
+  leaderboard: LeaderboardEntry[]
+}
+
+/**
+ * Dashboard data returned to authenticated users
+ */
+export interface DashboardData {
+  competitions: Competition[]
+  userPicks: Pick[]
+  userRank: number | null
+}
+
+/**
+ * Standardized API error response
+ */
+export interface ApiError {
+  error: string
+}
