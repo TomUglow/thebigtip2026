@@ -18,7 +18,7 @@ export default function LandingPage() {
               <div>
                 <span
                   className="text-[11px] uppercase tracking-wider font-black px-3 py-1 rounded-full inline-block mb-4"
-                  style={{ backgroundColor: '#FFD700', color: '#000' }}
+                  style={{ backgroundColor: '#FFD700', opacity: 0.2, color: '#000' }}
                 >
                   Free To Play
                 </span>
