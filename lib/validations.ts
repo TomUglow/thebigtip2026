@@ -55,9 +55,10 @@ export const teamSchema = z.object({
 
 export type TeamInput = z.infer<typeof teamSchema>
 
-// Pick validation: user's prediction on an event
+// Pick validation: user's prediction on an event within a specific competition
 export const pickSchema = z.object({
   eventId: z.string().min(1, 'Event ID is required'),
+  competitionId: z.string().min(1, 'Competition ID is required'),
   selectedTeam: z.string().min(1, 'Selected team is required'),
 })
 

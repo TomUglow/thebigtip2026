@@ -46,6 +46,7 @@ model Competition {
   events      CompetitionEvent[]
   users       CompetitionUser[]
   payments    Payment[]
+  picks       Pick[]
 }
 
 model CompetitionUser {
@@ -54,6 +55,7 @@ model CompetitionUser {
   competitionId String
   score         Int         @default(0)
   rank          Int?
+  role          String      @default("member")
   joinedAt      DateTime    @default(now())
   competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   user          User        @relation(fields: [userId], references: [id])
@@ -96,18 +98,20 @@ model CompetitionEvent {
 }
 
 model Pick {
-  id           String   @id @default(cuid())
-  userId       String
-  eventId      String
-  selectedTeam String
-  isCorrect    Boolean?
-  points       Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user         User     @relation(fields: [userId], references: [id])
+  id            String      @id @default(cuid())
+  userId        String
+  eventId       String
+  competitionId String
+  selectedTeam  String
+  isCorrect     Boolean?
+  points        Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
+  @@unique([userId, eventId, competitionId])
 }
 
 model FavoriteTeam {

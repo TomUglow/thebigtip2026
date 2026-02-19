@@ -16,15 +16,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const competitionId = searchParams.get('competitionId')
 
-    let whereClause: any = { userId }
+    const whereClause: any = { userId }
 
     if (competitionId) {
-      // Only return picks for events in this competition
-      const competitionEvents = await prisma.competitionEvent.findMany({
-        where: { competitionId },
-        select: { eventId: true },
-      })
-      whereClause.eventId = { in: competitionEvents.map((ce) => ce.eventId) }
+      whereClause.competitionId = competitionId
     }
 
     const picks = await prisma.pick.findMany({
@@ -32,6 +27,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         eventId: true,
+        competitionId: true,
         selectedTeam: true,
         isCorrect: true,
         points: true,
@@ -62,7 +58,23 @@ export async function POST(request: Request) {
       return apiError('Invalid pick data', 400)
     }
 
-    const { eventId, selectedTeam } = result.data
+    const { eventId, competitionId, selectedTeam } = result.data
+
+    // Verify user is a member of this competition
+    const membership = await prisma.competitionUser.findUnique({
+      where: { userId_competitionId: { userId, competitionId } },
+    })
+    if (!membership) {
+      return apiError('Not a member of this competition', 403)
+    }
+
+    // Verify the event belongs to this competition
+    const competitionEvent = await prisma.competitionEvent.findUnique({
+      where: { competitionId_eventId: { competitionId, eventId } },
+    })
+    if (!competitionEvent) {
+      return apiError('Event does not belong to this competition', 404)
+    }
 
     // Fetch event to validate
     const event = await prisma.event.findUnique({
@@ -96,37 +108,18 @@ export async function POST(request: Request) {
       return apiError('Event has already started', 400)
     }
 
-    // Check if pick already exists
-    const existingPick = await prisma.pick.findUnique({
+    // Upsert pick scoped to this competition
+    const pick = await prisma.pick.upsert({
       where: {
-        userId_eventId: {
+        userId_eventId_competitionId: {
           userId,
           eventId,
+          competitionId,
         },
       },
+      update: { selectedTeam },
+      create: { userId, eventId, competitionId, selectedTeam },
     })
-
-    let pick
-    if (existingPick) {
-      // Update existing pick
-      pick = await prisma.pick.update({
-        where: {
-          id: existingPick.id,
-        },
-        data: {
-          selectedTeam,
-        },
-      })
-    } else {
-      // Create new pick
-      pick = await prisma.pick.create({
-        data: {
-          userId,
-          eventId,
-          selectedTeam,
-        },
-      })
-    }
 
     return apiSuccess(pick, 201)
   } catch (error) {

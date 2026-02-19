@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { competitionCreateSchema } from '@/lib/validations'
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
+
+function generateInviteCode(): string {
+  // 8-character uppercase alphanumeric, excluding easily confused chars (O, 0, I, 1)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  return Array.from(
+    randomBytes(8),
+    (b: number) => chars[b % chars.length]
+  ).join('')
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -109,6 +119,7 @@ export async function POST(request: Request) {
           startDate: parsedStartDate,
           endDate,
           isPublic: false,
+          inviteCode: generateInviteCode(),
           maxEvents: eventIds.length,
           status: 'upcoming',
           ownerId: userId,
@@ -126,6 +137,7 @@ export async function POST(request: Request) {
         data: {
           userId,
           competitionId: comp.id,
+          role: 'commissioner',
         },
       })
 

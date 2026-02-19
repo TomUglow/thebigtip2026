@@ -40,13 +40,16 @@ export interface Competition {
   participantCount: number
   eventCount: number
   isJoined: boolean
+  ownerId: string
   owner: { id: string; name: string | null }
+  inviteCode: string | null
 }
 
 export interface LeaderboardEntry {
   rank: number
   user: { id: string; name: string | null; email: string; avatar: string | null }
   score: number
+  role: string
 }
 
 /**

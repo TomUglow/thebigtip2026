@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { Competition } from '@/lib/types'
 import MainEventCard from '@/components/dashboard/MainEventCard'
+import { clientCache } from '@/lib/client-cache'
 
 function CompetitionRow({ competition }: { competition: Competition }) {
   return (
@@ -87,11 +88,21 @@ export default function LobbyPage() {
   const [joinCodeSuccess, setJoinCodeSuccess] = useState('')
 
   useEffect(() => {
+    const CACHE_KEY = 'competitions'
     const fetchCompetitions = async () => {
       try {
+        const cached = clientCache.get<Competition[]>(CACHE_KEY)
+        if (cached) {
+          setCompetitions(cached)
+          setLoading(false)
+          return
+        }
         const res = await fetch('/api/competitions')
         const data = await res.json()
-        if (Array.isArray(data)) setCompetitions(data)
+        if (Array.isArray(data)) {
+          clientCache.set(CACHE_KEY, data, 2 * 60 * 1000)
+          setCompetitions(data)
+        }
       } catch (error) {
         console.error('Error fetching competitions:', error)
       } finally {
@@ -126,10 +137,15 @@ export default function LobbyPage() {
       setJoinCodeSuccess('Successfully joined competition!')
       setJoinCode('')
 
-      // Refresh competitions list
+      // Invalidate cache and refresh competitions list
+      clientCache.invalidate('competitions')
+      clientCache.invalidate('dashboard')
       const compsRes = await fetch('/api/competitions')
       const compsData = await compsRes.json()
-      if (Array.isArray(compsData)) setCompetitions(compsData)
+      if (Array.isArray(compsData)) {
+        clientCache.set('competitions', compsData, 2 * 60 * 1000)
+        setCompetitions(compsData)
+      }
     } catch (error) {
       console.error('Error joining by code:', error)
       setJoinCodeError('An error occurred. Please try again.')
