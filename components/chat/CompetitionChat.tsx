@@ -276,13 +276,8 @@ export default function CompetitionChat({
   // Submit a suggestion for a brand-new event to platform admins
   const handleSubmitNewEventRequest = async () => {
     const { sport, eventTitle, eventDate, options } = newEventForm
-    if (!sport || !eventTitle || !eventDate || !options.trim()) {
-      setRequestError('All fields are required')
-      return
-    }
-    const optionsList = options.split(',').map((o) => o.trim()).filter(Boolean)
-    if (optionsList.length < 2) {
-      setRequestError('At least 2 comma-separated options required')
+    if (!sport || !eventTitle) {
+      setRequestError('Sport and event title are required')
       return
     }
 
@@ -297,7 +292,12 @@ export default function CompetitionChat({
         body: JSON.stringify({
           type: 'platform_event_request',
           content,
-          requestMeta: { sport, eventTitle, eventDate, options: optionsList },
+          requestMeta: {
+            sport,
+            eventTitle,
+            ...(eventDate && { eventDate }),
+            ...(options.trim() && { options: options.trim() }),
+          },
         }),
       })
       if (!res.ok) {
@@ -522,9 +522,11 @@ export default function CompetitionChat({
                               {format(new Date(meta.eventDate as string), 'dd MMM yyyy')}
                             </p>
                           )}
-                          {meta?.options && Array.isArray(meta.options) && (
+                          {meta?.options && (
                             <p className="text-xs text-muted-foreground truncate">
-                              Options: {(meta.options as string[]).join(', ')}
+                              Options: {Array.isArray(meta.options)
+                                ? (meta.options as string[]).join(', ')
+                                : (meta.options as string)}
                             </p>
                           )}
                           <div className="flex items-center gap-1.5 pt-1">
@@ -733,16 +735,21 @@ export default function CompetitionChat({
                       className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                     />
 
-                    <input
-                      type="date"
-                      value={newEventForm.eventDate}
-                      onChange={(e) => setNewEventForm((f) => ({ ...f, eventDate: e.target.value }))}
-                      className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
+                    <div>
+                      <label className="block text-[10px] text-muted-foreground mb-1">
+                        Event start date <span className="italic">(optional)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={newEventForm.eventDate}
+                        onChange={(e) => setNewEventForm((f) => ({ ...f, eventDate: e.target.value }))}
+                        className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
 
                     <input
                       type="text"
-                      placeholder="Options (comma-separated, min 2)..."
+                      placeholder="Options / betting choices (optional)..."
                       value={newEventForm.options}
                       onChange={(e) => setNewEventForm((f) => ({ ...f, options: e.target.value }))}
                       className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"

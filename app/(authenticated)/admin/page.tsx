@@ -69,7 +69,7 @@ interface AdminNotification {
       sport?: string
       eventTitle?: string
       eventDate?: string
-      options?: string[]
+      options?: string | string[]
     }
     competitionId?: string
     competitionName?: string
@@ -370,7 +370,7 @@ export default function AdminPage() {
       if (meta.sport && SPORTS.includes(meta.sport)) setSport(meta.sport)
       if (meta.eventTitle) setTitle(meta.eventTitle)
       if (meta.eventDate) setEventDate(meta.eventDate.slice(0, 10))
-      if (meta.options?.length) setOptionsText(meta.options.join('\n'))
+      if (meta.options) setOptionsText(Array.isArray(meta.options) ? meta.options.join('\n') : meta.options)
     }
     setActiveTab('events')
   }
@@ -971,10 +971,12 @@ export default function AdminPage() {
                                 </span>
                               </div>
                             )}
-                            {meta.options && meta.options.length > 0 && (
+                            {meta.options && (
                               <div className="flex gap-3">
                                 <span className="text-muted-foreground w-20 shrink-0">Options</span>
-                                <span className="font-semibold">{meta.options.join(', ')}</span>
+                                <span className="font-semibold">
+                                  {Array.isArray(meta.options) ? meta.options.join(', ') : meta.options}
+                                </span>
                               </div>
                             )}
                           </div>
