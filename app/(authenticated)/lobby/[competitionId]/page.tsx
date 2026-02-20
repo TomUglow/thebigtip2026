@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type { Event, Competition, LeaderboardEntry } from '@/lib/types'
+import CompetitionChat from '@/components/chat/CompetitionChat'
 
 interface UserPick {
   id: string
@@ -709,6 +710,15 @@ export default function CompetitionDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Group chat — private competitions only */}
+      {!competition.isPublic && currentUserId && (
+        <CompetitionChat
+          competitionId={competitionId}
+          currentUserId={currentUserId}
+          currentUserIsCommissioner={currentUserIsCommissioner}
+        />
       )}
 
       {/* Delete competition confirmation modal */}

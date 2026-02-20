@@ -110,3 +110,27 @@ export interface DashboardData {
 export interface ApiError {
   error: string
 }
+
+/**
+ * Chat message in a competition group chat
+ * type "chat" = regular message, "event_request" = structured event request
+ */
+export interface ChatMessage {
+  id: string
+  competitionId: string
+  userId: string
+  type: 'chat' | 'event_request'
+  content: string
+  requestMeta?: {
+    sport: string
+    eventTitle: string
+    eventDate: string
+    options: string[]
+  } | null
+  status?: 'pending' | 'approved' | 'rejected' | null
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  user: { id: string; name: string | null; avatar: string | null }
+}

@@ -26,6 +26,7 @@ model User {
   favoriteTeams    FavoriteTeam[]
   payments         Payment[]
   notifications    Notification[]
+  messages         Message[]
 }
 
 model Competition {
@@ -48,6 +49,7 @@ model Competition {
   users       CompetitionUser[]
   payments    Payment[]
   picks       Pick[]
+  messages    Message[]
 }
 
 model CompetitionUser {
@@ -156,6 +158,25 @@ model OddsSnapshot {
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+// Competition group chat messages and event requests
+model Message {
+  id            String      @id @default(cuid())
+  competitionId String
+  userId        String
+  type          String      @default("chat")  // "chat" | "event_request"
+  content       String
+  requestMeta   Json?       // { sport, eventTitle, eventDate, options[] } for event_request type
+  status        String?     // "pending" | "approved" | "rejected" (event_request only)
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@index([competitionId, createdAt])
 }
 
 // User notifications and alerts
