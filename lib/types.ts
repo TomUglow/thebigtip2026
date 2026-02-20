@@ -113,19 +113,24 @@ export interface ApiError {
 
 /**
  * Chat message in a competition group chat
- * type "chat" = regular message, "event_request" = structured event request
+ * type "chat"                   = regular message
+ * type "event_request"          = request to add an existing platform event to this competition
+ * type "platform_event_request" = suggest a brand-new event to platform admins
  */
 export interface ChatMessage {
   id: string
   competitionId: string
   userId: string
-  type: 'chat' | 'event_request'
+  type: 'chat' | 'event_request' | 'platform_event_request'
   content: string
   requestMeta?: {
-    sport: string
-    eventTitle: string
-    eventDate: string
-    options: string[]
+    // event_request (existing event)
+    eventId?: string
+    eventTitle?: string
+    sport?: string
+    eventDate?: string
+    // platform_event_request (new event suggestion)
+    options?: string[]
   } | null
   status?: 'pending' | 'approved' | 'rejected' | null
   resolvedBy?: string | null

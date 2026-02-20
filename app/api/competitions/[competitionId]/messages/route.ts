@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/competitions/[competitionId]/messages
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { competitionId: string } }
 ) {
   try {
@@ -22,7 +22,6 @@ export async function GET(
 
     const { competitionId } = params
 
-    // Verify user is a member of this competition
     const membership = await prisma.competitionUser.findUnique({
       where: { userId_competitionId: { userId, competitionId } },
       select: { role: true },
@@ -48,7 +47,10 @@ export async function GET(
 /**
  * Post a message to a competition's group chat
  * POST /api/competitions/[competitionId]/messages
- * Body: { type: "chat" | "event_request", content: string, requestMeta?: {...} }
+ *
+ * type "chat"                   — regular message
+ * type "event_request"          — request to add existing platform event to competition
+ * type "platform_event_request" — suggest brand-new event to platform admins (creates admin notifications)
  */
 export async function POST(
   request: NextRequest,
@@ -61,7 +63,6 @@ export async function POST(
 
     const { competitionId } = params
 
-    // Verify user is a member of this competition
     const membership = await prisma.competitionUser.findUnique({
       where: { userId_competitionId: { userId, competitionId } },
       select: { role: true },
@@ -83,13 +84,39 @@ export async function POST(
         userId,
         type,
         content,
-        requestMeta: type === 'event_request' ? requestMeta : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        requestMeta: (type !== 'chat' ? requestMeta : undefined) as any,
         status: type === 'event_request' ? 'pending' : undefined,
       },
       include: {
         user: { select: { id: true, name: true, avatar: true } },
       },
     })
+
+    // For platform event requests: notify all admin users
+    if (type === 'platform_event_request') {
+      const meta = requestMeta as Record<string, unknown>
+      const senderName = message.user.name ?? 'A user'
+      const eventTitle = (meta?.eventTitle as string) ?? 'a new event'
+      const sport = (meta?.sport as string) ?? ''
+
+      const admins = await prisma.user.findMany({
+        where: { isAdmin: true },
+        select: { id: true },
+      })
+
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((admin) => ({
+            userId: admin.id,
+            type: 'platform_event_request',
+            title: 'New Event Suggestion',
+            message: `${senderName} suggested a new event: ${eventTitle}${sport ? ` (${sport})` : ''}`,
+            data: { competitionId, messageId: message.id, ...meta },
+          })),
+        })
+      }
+    }
 
     return apiSuccess(message, 201)
   } catch (error) {

@@ -87,23 +87,17 @@ export const joinByCodeSchema = z.object({
 export type JoinByCodeInput = z.infer<typeof joinByCodeSchema>
 
 // Chat message creation validation
+// type "chat"                  — regular message
+// type "event_request"         — request to add an existing platform event to this competition (→ commissioner)
+// type "platform_event_request"— suggest a brand-new event to platform admins (→ admins)
 export const messageCreateSchema = z
   .object({
-    type: z.enum(['chat', 'event_request']),
+    type: z.enum(['chat', 'event_request', 'platform_event_request']),
     content: z.string().min(1, 'Message cannot be empty').max(1000, 'Message too long'),
-    requestMeta: z
-      .object({
-        sport: z.string().min(1, 'Sport is required'),
-        eventTitle: z.string().min(1, 'Event title is required'),
-        eventDate: z.string().min(1, 'Event date is required'),
-        options: z
-          .array(z.string().min(1))
-          .min(2, 'At least 2 options required')
-          .max(50, 'Too many options'),
-      })
-      .optional(),
+    // Flexible JSON metadata — validated per-type in the API route
+    requestMeta: z.record(z.unknown()).optional(),
   })
-  .refine((d) => d.type !== 'event_request' || !!d.requestMeta, {
+  .refine((d) => d.type === 'chat' || !!d.requestMeta, {
     message: 'requestMeta is required for event requests',
     path: ['requestMeta'],
   })

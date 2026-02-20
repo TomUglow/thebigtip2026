@@ -716,6 +716,7 @@ export default function CompetitionDetailPage() {
       {!competition.isPublic && currentUserId && (
         <CompetitionChat
           competitionId={competitionId}
+          competitionName={competition.name}
           currentUserId={currentUserId}
           currentUserIsCommissioner={currentUserIsCommissioner}
         />
