@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { getServerSession } from 'next-auth'
+import type { Session } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import DashboardClient from './DashboardClient'
@@ -30,7 +31,7 @@ const emptyProps = {
 
 export default async function DashboardPage() {
   // Get session — if it fails or is missing, middleware/AuthGuard will redirect
-  let session: Awaited<ReturnType<typeof getServerSession>> = null
+  let session: Session | null = null
   try {
     session = await getServerSession(authOptions)
   } catch (err) {
@@ -83,7 +84,7 @@ export default async function DashboardPage() {
     picks = results[2]
   } catch (err) {
     console.error('Dashboard DB query failed:', err)
-    return <DashboardClient {...emptyProps} userName={session.user?.name ?? null} />
+    return <DashboardClient {...emptyProps} userName={session?.user?.name ?? null} />
   }
 
   const joinedCompIds = new Set(memberships.map((m) => m.competitionId))
@@ -153,7 +154,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardClient
-      userName={session.user?.name ?? null}
+      userName={session?.user?.name ?? null}
       competitions={comps}
       userPicks={picks}
       userRank={userRank}
