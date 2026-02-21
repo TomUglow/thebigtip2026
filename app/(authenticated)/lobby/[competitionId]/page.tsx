@@ -7,11 +7,12 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import {
   ArrowLeft, CheckCircle2, Target, Trophy, Filter, Copy, X,
-  Shield, ClipboardCopy, MoreVertical, Trash2, Lock,
+  Shield, ClipboardCopy, MoreVertical, Trash2, Lock, Plus, Inbox,
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type { Event, Competition, LeaderboardEntry } from '@/lib/types'
-import CompetitionChat from '@/components/chat/CompetitionChat'
+import EventRequestModal from '@/components/EventRequestModal'
+import PendingRequestsSection from '@/components/PendingRequestsSection'
 
 interface UserPick {
   id: string
@@ -49,6 +50,9 @@ export default function CompetitionDetailPage() {
   const [showPrefillModal, setShowPrefillModal] = useState(false)
   const [selectedSourceComp, setSelectedSourceComp] = useState('')
   const [prefilling, setPrefilling] = useState(false)
+
+  // Event request modal
+  const [showEventRequestModal, setShowEventRequestModal] = useState(false)
 
   // Commissioner management state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
@@ -377,14 +381,25 @@ export default function CompetitionDetailPage() {
         {/* ── Tips column ── */}
         <div className="lg:col-span-3 space-y-4">
           {/* Section heading */}
-          <div className="flex items-center gap-2">
-            {isLocked
-              ? <Lock className="w-4 h-4 text-muted-foreground" />
-              : <Target className="w-4 h-4 text-primary" />
-            }
-            <h2 className="text-lg font-bold uppercase tracking-wider">
-              {isLocked ? 'View Tips' : 'Place Tips'}
-            </h2>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              {isLocked
+                ? <Lock className="w-4 h-4 text-muted-foreground" />
+                : <Target className="w-4 h-4 text-primary" />
+              }
+              <h2 className="text-lg font-bold uppercase tracking-wider">
+                {isLocked ? 'View Tips' : 'Place Tips'}
+              </h2>
+            </div>
+            {!competition.isPublic && currentUserId && (
+              <button
+                onClick={() => setShowEventRequestModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Request Event
+              </button>
+            )}
           </div>
 
           {/* Pre-fill banner — only when tips are open */}
@@ -456,16 +471,18 @@ export default function CompetitionDetailPage() {
                     key={event.id}
                     className={`flex items-center gap-3 px-4 py-3 ${!isLast ? 'border-b border-border' : ''}`}
                   >
-                    <span
-                      className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0 min-w-[70px] text-center"
-                      style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
-                    >
-                      {event.sport}
-                    </span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate">{event.title}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {format(new Date(event.eventDate), 'd MMM yyyy')}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span
+                          className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0"
+                          style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
+                        >
+                          {event.sport}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {format(new Date(event.eventDate), 'd MMM yyyy')}
+                        </span>
                       </div>
                     </div>
 
@@ -635,6 +652,19 @@ export default function CompetitionDetailPage() {
               <p className="text-xs mt-1">Results will appear once scoring begins.</p>
             </div>
           )}
+
+          {/* Pending event requests — commissioners only, private competitions only */}
+          {currentUserIsCommissioner && !competition.isPublic && (
+            <div className="glass-card rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                <Inbox className="w-4 h-4 text-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-wider">Event Requests</h2>
+              </div>
+              <div className="p-3">
+                <PendingRequestsSection competitionId={competitionId} />
+              </div>
+            </div>
+          )}
         </div>
 
       </div>{/* end grid */}
@@ -712,15 +742,12 @@ export default function CompetitionDetailPage() {
         </div>
       )}
 
-      {/* Group chat — private competitions only */}
-      {!competition.isPublic && currentUserId && (
-        <CompetitionChat
-          competitionId={competitionId}
-          competitionName={competition.name}
-          currentUserId={currentUserId}
-          currentUserIsCommissioner={currentUserIsCommissioner}
-        />
-      )}
+      {/* Event request modal */}
+      <EventRequestModal
+        competitionId={competitionId}
+        isOpen={showEventRequestModal}
+        onClose={() => setShowEventRequestModal(false)}
+      />
 
       {/* Delete competition confirmation modal */}
       {showDeleteConfirm && (

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return apiSuccess(notifications)
+    return apiSuccess({ data: notifications })
   } catch (error) {
     console.error('Error fetching notifications:', error)
     return apiError('Failed to fetch notifications', 500)

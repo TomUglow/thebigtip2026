@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/competitions/[competitionId]/messages
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { competitionId: string } }
 ) {
   try {
@@ -22,6 +22,9 @@ export async function GET(
     if (userId instanceof Response) return userId
 
     const { competitionId } = params
+    const { searchParams } = new URL(request.url)
+    const typeFilter = searchParams.get('type')
+    const statusFilter = searchParams.get('status')
 
     const membership = await prisma.competitionUser.findUnique({
       where: { userId_competitionId: { userId, competitionId } },
@@ -30,7 +33,11 @@ export async function GET(
     if (!membership) return apiError('Not a member of this competition', 403)
 
     const messages = await prisma.message.findMany({
-      where: { competitionId },
+      where: {
+        competitionId,
+        ...(typeFilter ? { type: typeFilter } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      },
       include: {
         user: { select: { id: true, name: true, avatar: true } },
       },

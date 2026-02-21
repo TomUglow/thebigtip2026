@@ -10,6 +10,7 @@ import {
 import type { Competition } from '@/lib/types'
 import MainEventCard from '@/components/dashboard/MainEventCard'
 import { clientCache } from '@/lib/client-cache'
+import PublicEventRequestModal from '@/components/PublicEventRequestModal'
 
 function CompetitionRow({ competition }: { competition: Competition }) {
   return (
@@ -86,6 +87,7 @@ export default function LobbyPage() {
   const [joiningByCode, setJoiningByCode] = useState(false)
   const [joinCodeError, setJoinCodeError] = useState('')
   const [joinCodeSuccess, setJoinCodeSuccess] = useState('')
+  const [showEventRequestModal, setShowEventRequestModal] = useState(false)
 
   useEffect(() => {
     const CACHE_KEY = 'competitions'
@@ -177,14 +179,28 @@ export default function LobbyPage() {
             Your competitions and ones you can join.
           </p>
         </div>
-        <Link
-          href="/lobby/create"
-          className="glass-card px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover-elevate hover:border-primary/50 transition-colors w-fit"
-        >
-          <Plus className="w-4 h-4" />
-          Create League
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowEventRequestModal(true)}
+            className="glass-card px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover-elevate hover:border-primary/50 transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            Request Event
+          </button>
+          <Link
+            href="/lobby/create"
+            className="glass-card px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover-elevate hover:border-primary/50 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Create League
+          </Link>
+        </div>
       </div>
+
+      <PublicEventRequestModal
+        isOpen={showEventRequestModal}
+        onClose={() => setShowEventRequestModal(false)}
+      />
 
       <MainEventCard competitions={competitions} />
 

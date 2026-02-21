@@ -19,7 +19,10 @@ import {
   X,
   Check,
   Bell,
+  Filter,
+  Target,
 } from 'lucide-react'
+import { format } from 'date-fns'
 import { SPORT_COLORS } from '@/lib/constants'
 
 type Tab = 'members' | 'events' | 'competitions' | 'results' | 'requests'
@@ -135,6 +138,8 @@ export default function AdminPage() {
   const [compDescription, setCompDescription] = useState('')
   const [compStartDate, setCompStartDate] = useState('')
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set())
+  const [compSportFilter, setCompSportFilter] = useState('All')
+  const [compSearchQuery, setCompSearchQuery] = useState('')
 
   // Results
   const [resultWinners, setResultWinners] = useState<Record<string, string>>({})
@@ -380,6 +385,25 @@ export default function AdminPage() {
   const filteredEvents = sportFilter === 'All' ? events : events.filter((e) => e.sport === sportFilter)
   const eventsNeedingResults = events.filter((e) => e.status !== 'completed' && !resultSuccess[e.id])
   const selectableEvents = events.filter((e) => e.status !== 'completed')
+
+  const compUniqueSports = ['All', ...Array.from(new Set(selectableEvents.map((e) => e.sport))).sort()]
+  const compFilteredEvents = selectableEvents
+    .filter((e) => compSportFilter === 'All' || e.sport === compSportFilter)
+    .filter((e) => !compSearchQuery || (e.title || '').toLowerCase().includes(compSearchQuery.toLowerCase()))
+  const allCompFilteredSelected =
+    compFilteredEvents.length > 0 && compFilteredEvents.every((e) => selectedEventIds.has(e.id))
+
+  const handleSelectAllComp = () => {
+    setSelectedEventIds((prev) => {
+      const next = new Set(prev)
+      if (allCompFilteredSelected) {
+        compFilteredEvents.forEach((e) => next.delete(e.id))
+      } else {
+        compFilteredEvents.forEach((e) => next.add(e.id))
+      }
+      return next
+    })
+  }
 
   const unreadRequestCount = requests.filter((r) => !r.read).length
 
@@ -719,25 +743,117 @@ export default function AdminPage() {
                   <input type="text" value={compDescription} onChange={(e) => setCompDescription(e.target.value)} placeholder="Brief description of the competition" className={inputCls} />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2">Select Events <span className="font-normal text-muted-foreground">({selectedEventIds.size} selected)</span></label>
+              {/* Event picker */}
+              <div className="space-y-3">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-5 h-5 gold-accent" />
+                    <h3 className="text-lg font-bold uppercase tracking-wider font-display">Select Events</h3>
+                    <span className="text-sm text-muted-foreground">({selectedEventIds.size} selected)</span>
+                  </div>
+                  {!eventsLoading && selectableEvents.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllComp}
+                      className="text-xs text-primary hover:underline font-semibold"
+                    >
+                      {allCompFilteredSelected ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+
                 {eventsLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground py-4"><RefreshCw className="w-4 h-4 animate-spin" /> Loading events...</div>
                 ) : selectableEvents.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2">No upcoming events. Create events first.</p>
                 ) : (
-                  <div className="border border-border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-                    {selectableEvents.map((event, idx) => (
-                      <label key={event.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors ${idx < selectableEvents.length - 1 ? 'border-b border-border/50' : ''} ${selectedEventIds.has(event.id) ? 'bg-primary/5' : ''}`}>
-                        <input type="checkbox" checked={selectedEventIds.has(event.id)} onChange={() => toggleEventSelection(event.id)} className="w-4 h-4 rounded accent-primary" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{event.title || `${event.sport} Event`}</div>
-                          <div className="text-xs text-muted-foreground">{event.sport} · {new Date(event.eventDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  <>
+                    {/* Sport filter pills */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {compUniqueSports.map((s) => {
+                        const sportColor = s === 'All' ? '#D32F2F' : SPORT_COLORS[s] || '#D32F2F'
+                        const isActive = compSportFilter === s
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setCompSportFilter(s)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                              isActive
+                                ? 'text-white shadow-sm'
+                                : 'text-foreground/70 hover:text-foreground bg-muted/50 border border-border'
+                            }`}
+                            style={isActive ? { backgroundColor: sportColor } : undefined}
+                          >
+                            {s}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Search bar */}
+                    <div className="relative">
+                      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search events..."
+                        value={compSearchQuery}
+                        onChange={(e) => setCompSearchQuery(e.target.value)}
+                        className="w-full bg-muted/50 border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Event list */}
+                    <div className="glass-card rounded-xl overflow-hidden">
+                      {compFilteredEvents.length > 0 ? (
+                        compFilteredEvents.map((event, idx) => {
+                          const isSelected = selectedEventIds.has(event.id)
+                          const sportColor = SPORT_COLORS[event.sport] || '#D32F2F'
+                          const isLast = idx === compFilteredEvents.length - 1
+                          return (
+                            <div
+                              key={event.id}
+                              onClick={() => toggleEventSelection(event.id)}
+                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                                !isLast ? 'border-b border-border' : ''
+                              } ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/30'}`}
+                            >
+                              {/* Checkbox */}
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                  isSelected ? 'bg-primary border-primary' : 'border-border'
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </div>
+
+                              {/* Sport badge */}
+                              <span
+                                className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0 min-w-[80px] text-center"
+                                style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
+                              >
+                                {event.sport}
+                              </span>
+
+                              {/* Event info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold truncate">{event.title || `${event.sport} Event`}</div>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {format(new Date(event.eventDate), 'd MMM yyyy')}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="py-12 text-center text-muted-foreground">
+                          <Target className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                          <p className="text-sm">No events found{compSearchQuery && ` matching "${compSearchQuery}"`}.</p>
                         </div>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${event.status === 'live' ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground'}`}>{event.status}</span>
-                      </label>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
               {createCompError && <div className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg"><AlertTriangle className="w-4 h-4 shrink-0" /> {createCompError}</div>}
