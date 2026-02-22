@@ -1,18 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { ChevronDown, ChevronLeft, Check, Eye, EyeOff } from 'lucide-react'
+import { ChevronLeft, Check, Eye, EyeOff } from 'lucide-react'
 import { useTheme } from '@/components/providers/ThemeProvider'
 
-const SPORTS_DATA: Record<string, string[]> = {
-  'NFL': ['Kansas City Chiefs', 'San Francisco 49ers', 'Buffalo Bills', 'Dallas Cowboys'],
-  'NBA': ['Boston Celtics', 'Los Angeles Lakers', 'Denver Nuggets', 'Golden State Warriors'],
-  'EPL': ['Manchester City', 'Liverpool', 'Arsenal', 'Manchester United'],
-  'AFL': ['Melbourne Demons', 'Geelong Cats', 'Brisbane Lions', 'Richmond Tigers'],
-  'NRL': ['Penrith Panthers', 'Melbourne Storm', 'Parramatta Eels', 'Sydney Roosters'],
+interface SportEntry {
+  sport: string
+  teams: string[]
+  hasTeams: boolean
 }
 
 interface FormData {
@@ -36,7 +34,7 @@ interface FormErrors {
 }
 
 const STEPS = [
-  { label: 'You', heading: 'Who are you?', sub: 'Step 1 of 3 — Let\'s get started' },
+  { label: 'You', heading: 'Who are you?', sub: "Step 1 of 3 — Let's get started" },
   { label: 'Account', heading: 'Lock in your account', sub: 'Step 2 of 3 — Almost there' },
   { label: 'Teams', heading: 'Pick your teams', sub: 'Step 3 of 3 — The fun part' },
 ]
@@ -81,9 +79,31 @@ export default function RegisterPage() {
   const [checkingUsername, setCheckingUsername] = useState(false)
   const [mobileAvailable, setMobileAvailable] = useState<boolean | null>(null)
   const [checkingMobile, setCheckingMobile] = useState(false)
-  const [expandedSports, setExpandedSports] = useState<Set<string>>(new Set())
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+
+  // Step 3 sports/teams state
+  const [sportsData, setSportsData] = useState<SportEntry[]>([])
+  const [loadingSports, setLoadingSports] = useState(false)
+  const [sportsFetchError, setSportsFetchError] = useState(false)
+  const [activeSport, setActiveSport] = useState<string | null>(null)
+
+  // Fetch sports/teams when reaching step 3
+  useEffect(() => {
+    if (step !== 2 || sportsData.length > 0 || loadingSports) return
+    setLoadingSports(true)
+    setSportsFetchError(false)
+    fetch('/api/events/sports-teams')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.sports && data.sports.length > 0) {
+          setSportsData(data.sports)
+          setActiveSport(data.sports[0].sport)
+        }
+      })
+      .catch(() => setSportsFetchError(true))
+      .finally(() => setLoadingSports(false))
+  }, [step, sportsData.length, loadingSports])
 
   const checkUsername = useCallback(async (username: string) => {
     if (!username || username.length < 3) {
@@ -145,15 +165,6 @@ export default function RegisterPage() {
     }
   }
 
-  const toggleSport = (sport: string) => {
-    setExpandedSports((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(sport)) newSet.delete(sport)
-      else newSet.add(sport)
-      return newSet
-    })
-  }
-
   const toggleTeam = (sport: string, team: string) => {
     setFormData((prev) => {
       const existing = prev.favoriteTeams.find((t) => t.sport === sport && t.team === team)
@@ -166,6 +177,9 @@ export default function RegisterPage() {
 
   const isTeamSelected = (sport: string, team: string) =>
     formData.favoriteTeams.some((t) => t.sport === sport && t.team === team)
+
+  const isSportSelected = (sport: string) =>
+    formData.favoriteTeams.some((t) => t.sport === sport)
 
   const validateStep = (stepIndex: number): FormErrors => {
     const newErrors: FormErrors = {}
@@ -267,6 +281,7 @@ export default function RegisterPage() {
   }
 
   const passwordStrength = getPasswordStrength(formData.password)
+  const activeEntry = sportsData.find((s) => s.sport === activeSport)
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-8">
@@ -493,7 +508,6 @@ export default function RegisterPage() {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  {/* Password strength indicator */}
                   {formData.password.length > 0 && (
                     <div className="mt-2">
                       <div className="flex gap-1 h-1">
@@ -512,10 +526,15 @@ export default function RegisterPage() {
                           />
                         ))}
                       </div>
-                      <p className={`text-xs mt-1 ${
-                        passwordStrength.level === 1 ? 'text-red-500' :
-                        passwordStrength.level === 2 ? 'text-amber-500' : 'text-green-500'
-                      }`}>
+                      <p
+                        className={`text-xs mt-1 ${
+                          passwordStrength.level === 1
+                            ? 'text-red-500'
+                            : passwordStrength.level === 2
+                            ? 'text-amber-500'
+                            : 'text-green-500'
+                        }`}
+                      >
                         {passwordStrength.label}
                       </p>
                     </div>
@@ -576,65 +595,169 @@ export default function RegisterPage() {
             {/* ── Step 3: Teams + Confirm ── */}
             {step === 2 && (
               <div className="space-y-5">
-                {/* Favourite Teams */}
+                {/* Favourite Sports & Teams */}
                 <div>
-                  <label className="block text-sm font-semibold mb-3">
-                    Favourite Sports & Teams <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-                  </label>
-                  <div className="space-y-2">
-                    {Object.entries(SPORTS_DATA).map(([sport, teams]) => (
-                      <div key={sport} className="border border-border rounded-lg overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => toggleSport(sport)}
-                          className="w-full px-4 py-3 flex items-center justify-between bg-muted/50 hover:bg-muted transition-colors"
-                        >
-                          <span className="font-semibold text-sm">{sport}</span>
-                          <ChevronDown
-                            className={`w-4 h-4 transition-transform ${expandedSports.has(sport) ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-                        {expandedSports.has(sport) && (
-                          <div className="px-4 py-3 space-y-2 bg-background border-t border-border">
-                            {teams.map((team) => (
-                              <label key={team} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={isTeamSelected(sport, team)}
-                                  onChange={() => toggleTeam(sport, team)}
-                                  className="rounded border-border"
-                                />
-                                <span className="text-sm">{team}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
+                  <p className="text-sm font-semibold mb-3">
+                    Favourite Sports & Teams{' '}
+                    <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+                  </p>
+
+                  {/* Loading skeleton */}
+                  {loadingSports && (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="h-8 w-16 bg-muted rounded-full animate-pulse" />
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {formData.favoriteTeams.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {formData.favoriteTeams.map((fav) => (
-                        <div
-                          key={`${fav.sport}-${fav.team}`}
-                          className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3 py-1 text-xs"
-                        >
-                          <span>{fav.team}</span>
-                          <button
-                            type="button"
-                            onClick={() => toggleTeam(fav.sport, fav.team)}
-                            className="text-primary hover:opacity-70"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <div key={i} className="h-7 w-24 bg-muted rounded-full animate-pulse" />
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* Error state */}
+                  {sportsFetchError && !loadingSports && (
+                    <p className="text-xs text-muted-foreground">
+                      Couldn&apos;t load sports right now — you can add your favourite teams later in your profile.
+                    </p>
+                  )}
+
+                  {/* Empty state */}
+                  {!loadingSports && !sportsFetchError && sportsData.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No sports available yet — check back soon!
+                    </p>
+                  )}
+
+                  {/* Sport pills */}
+                  {!loadingSports && sportsData.length > 0 && (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {sportsData.map((entry) => {
+                          const isActive = activeSport === entry.sport
+                          const hasSelection = isSportSelected(entry.sport)
+                          return (
+                            <button
+                              key={entry.sport}
+                              type="button"
+                              onClick={() => setActiveSport(isActive ? null : entry.sport)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-150 ${
+                                isActive
+                                  ? 'border-2 border-primary bg-primary/10 text-primary'
+                                  : 'border border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                              }`}
+                            >
+                              {hasSelection && !isActive && (
+                                <span className="mr-1 text-xs">✓</span>
+                              )}
+                              {entry.sport}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Team grid for active sport */}
+                      {activeSport && activeEntry && (
+                        <div className="mt-4 p-4 bg-muted/30 rounded-xl border border-border">
+                          {activeEntry.hasTeams ? (
+                            <>
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  Select your {activeSport} teams
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleTeam(activeSport, 'Any')}
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 ${
+                                    isTeamSelected(activeSport, 'Any')
+                                      ? 'bg-primary/15 border-primary text-primary'
+                                      : 'border-border text-muted-foreground hover:border-primary/50'
+                                  }`}
+                                >
+                                  {isTeamSelected(activeSport, 'Any') ? '✓ Following' : '+ Follow'}
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {activeEntry.teams.map((team) => {
+                                  const selected = isTeamSelected(activeSport, team)
+                                  return (
+                                    <button
+                                      key={team}
+                                      type="button"
+                                      onClick={() => toggleTeam(activeSport, team)}
+                                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 ${
+                                        selected
+                                          ? 'bg-primary/15 border-primary text-primary'
+                                          : 'bg-background border-border text-foreground hover:border-primary/50'
+                                      }`}
+                                    >
+                                      {selected && <span className="mr-1">✓</span>}
+                                      {team}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">
+                                Follow all {activeSport} events
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => toggleTeam(activeSport, 'Any')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                                  isTeamSelected(activeSport, 'Any')
+                                    ? 'bg-primary/15 border-primary text-primary'
+                                    : 'border-border text-muted-foreground hover:border-primary/50'
+                                }`}
+                              >
+                                {isTeamSelected(activeSport, 'Any') ? '✓ Following' : '+ Follow'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Selected chips */}
+                      {formData.favoriteTeams.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {formData.favoriteTeams.map((fav) => (
+                            <div
+                              key={`${fav.sport}-${fav.team}`}
+                              className="inline-flex items-center gap-1.5 bg-primary/10 border border-primary/30 rounded-full px-3 py-1 text-xs font-medium"
+                            >
+                              <span className="text-muted-foreground">{fav.sport}</span>
+                              {fav.team !== 'Any' && (
+                                <>
+                                  <span className="text-muted-foreground/50">·</span>
+                                  <span>{fav.team}</span>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => toggleTeam(fav.sport, fav.team)}
+                                className="text-primary hover:opacity-70 ml-0.5"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Age verification */}
-                <div className={`p-4 rounded-lg border ${errors.ageVerified ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-muted/30'}`}>
+                <div
+                  className={`p-4 rounded-lg border ${
+                    errors.ageVerified ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-muted/30'
+                  }`}
+                >
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -650,8 +773,12 @@ export default function RegisterPage() {
                   {errors.ageVerified && <p className="text-red-500 text-xs mt-2">{errors.ageVerified}</p>}
                 </div>
 
-                {/* Terms & Conditions */}
-                <div className={`p-4 rounded-lg border ${errors.termsAccepted ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-muted/30'}`}>
+                {/* Terms & Conditions
+                <div
+                  className={`p-4 rounded-lg border ${
+                    errors.termsAccepted ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-muted/30'
+                  }`}
+                >
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -673,6 +800,7 @@ export default function RegisterPage() {
                   </label>
                   {errors.termsAccepted && <p className="text-red-500 text-xs mt-2">{errors.termsAccepted}</p>}
                 </div>
+                */}
 
                 <p className="text-center text-sm text-muted-foreground">
                   You&apos;re nearly there — time to tip some winners!
