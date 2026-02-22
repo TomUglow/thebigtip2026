@@ -149,6 +149,8 @@ export default function AdminPage() {
   const [compName, setCompName] = useState('')
   const [compDescription, setCompDescription] = useState('')
   const [compStartDate, setCompStartDate] = useState('')
+  const [compEntryFee, setCompEntryFee] = useState(0)
+  const [compPrizePool, setCompPrizePool] = useState(0)
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set())
   const [compSportFilter, setCompSportFilter] = useState('All')
   const [compSearchQuery, setCompSearchQuery] = useState('')
@@ -340,11 +342,11 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/competitions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: compName, description: compDescription || undefined, startDate: compStartDate, eventIds: Array.from(selectedEventIds) }),
+        body: JSON.stringify({ name: compName, description: compDescription || undefined, startDate: compStartDate, eventIds: Array.from(selectedEventIds), entryFee: compEntryFee, prizePool: compPrizePool }),
       })
       if (res.ok) {
         setCreateCompSuccess('Public competition created successfully')
-        setCompName(''); setCompDescription(''); setCompStartDate(''); setSelectedEventIds(new Set())
+        setCompName(''); setCompDescription(''); setCompStartDate(''); setCompEntryFee(0); setCompPrizePool(0); setSelectedEventIds(new Set())
         fetchCompetitions()
       } else {
         const data = await res.json()
@@ -817,6 +819,14 @@ export default function AdminPage() {
                 <div>
                   <label className="block text-sm font-semibold mb-1.5">Tips Close Date <span className="font-normal text-muted-foreground">(picks lock after this)</span></label>
                   <input type="datetime-local" value={compStartDate} onChange={(e) => setCompStartDate(e.target.value)} className={inputCls} required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Entry Fee <span className="font-normal text-muted-foreground">($)</span></label>
+                  <input type="number" min={0} step={1} value={compEntryFee} onChange={(e) => setCompEntryFee(Number(e.target.value) || 0)} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Prize Pool <span className="font-normal text-muted-foreground">($)</span></label>
+                  <input type="number" min={0} step={1} value={compPrizePool} onChange={(e) => setCompPrizePool(Number(e.target.value) || 0)} className={inputCls} />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold mb-1.5">Description <span className="font-normal text-muted-foreground">(optional)</span></label>

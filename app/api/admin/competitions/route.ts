@@ -20,6 +20,8 @@ const createCompSchema = z.object({
   description: z.string().optional(),
   startDate: z.string().min(1, 'Tips close date is required'),
   eventIds: z.array(z.string()).min(1, 'At least one event must be selected'),
+  entryFee: z.coerce.number().min(0).optional().default(0),
+  prizePool: z.coerce.number().min(0).optional().default(0),
 })
 
 export async function GET() {
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
       return apiError('Invalid competition data', 400)
     }
 
-    const { name, description, startDate, eventIds } = result.data
+    const { name, description, startDate, eventIds, entryFee = 0, prizePool = 0 } = result.data
 
     // Verify all selected events exist
     const validEvents = await prisma.event.findMany({
@@ -81,8 +83,8 @@ export async function POST(request: Request) {
         data: {
           name: name.trim(),
           description: description?.trim() || null,
-          entryFee: 0,
-          prizePool: 0,
+          entryFee,
+          prizePool,
           startDate: parsedStartDate,
           endDate,
           isPublic: true,
