@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-helpers'
+import { getPrizePoolForCompetitions } from '@/lib/competition-helpers'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +39,13 @@ export async function GET() {
       },
     })
 
-    return apiSuccess(competitions)
+    const prizePoolMap = await getPrizePoolForCompetitions(competitions)
+    const withPrizePool = competitions.map((c) => ({
+      ...c,
+      prizePool: prizePoolMap.get(c.id) ?? c.prizePool,
+    }))
+
+    return apiSuccess(withPrizePool)
   } catch (error) {
     console.error('Admin competitions GET error:', error)
     return apiError('Failed to fetch competitions', 500)
@@ -58,6 +65,9 @@ export async function POST(request: Request) {
     }
 
     const { name, description, startDate, eventIds, entryFee = 0, prizePool = 0 } = result.data
+
+    // Paid entry: prize pool is from entry fees. Free entry: admin sets prize pool.
+    const effectivePrizePool = entryFee > 0 ? 0 : prizePool
 
     // Verify all selected events exist
     const validEvents = await prisma.event.findMany({
@@ -84,7 +94,7 @@ export async function POST(request: Request) {
           name: name.trim(),
           description: description?.trim() || null,
           entryFee,
-          prizePool,
+          prizePool: effectivePrizePool,
           startDate: parsedStartDate,
           endDate,
           isPublic: true,
@@ -99,10 +109,7 @@ export async function POST(request: Request) {
         data: eventIds.map((eventId) => ({ competitionId: comp.id, eventId })),
       })
 
-      await tx.competitionUser.create({
-        data: { userId: adminId, competitionId: comp.id, role: 'commissioner' },
-      })
-
+      // Admin creates but does not join as competitor. Public events have no commissioner.
       return comp
     })
 

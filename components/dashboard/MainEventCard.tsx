@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, Target, Clock } from 'lucide-react'
+import { Users, Target, Clock, Trophy } from 'lucide-react'
 import EntryFeeCheckoutModal from '@/components/checkout/EntryFeeCheckoutModal'
 import type { Competition } from '@/lib/types'
 
@@ -169,12 +169,17 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" /> {mainCompetition.participantCount} tipsters
+                </span>
+                <span className="flex items-center gap-1">
+                  <Target className="w-3 h-3" /> {mainCompetition.eventCount} events
+                </span>
+              </div>
               <span className="flex items-center gap-1">
-                <Users className="w-3 h-3" /> {mainCompetition.participantCount} tipsters
-              </span>
-              <span className="flex items-center gap-1">
-                <Target className="w-3 h-3" /> {mainCompetition.eventCount} events
+                <Trophy className="w-3 h-3" /> Current Prize Pool: <span className="font-semibold text-foreground">${(mainCompetition.prizePool ?? 0).toFixed(0)}</span>
               </span>
             </div>
           </div>

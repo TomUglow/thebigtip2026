@@ -69,7 +69,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 space-y-12">
           <div className="text-center space-y-2">
             <h2 className="text-3xl lg:text-4xl font-black tracking-tight font-display">
-              Why Tipsters Love The Big Tip
+              Why You'll Love The Big Tip
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Everything you need to run your own tipping competition.

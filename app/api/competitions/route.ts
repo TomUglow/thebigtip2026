@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { competitionCreateSchema } from '@/lib/validations'
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
+import { getPrizePoolForCompetitions } from '@/lib/competition-helpers'
 
 function generateInviteCode(): string {
   // 8-character uppercase alphanumeric, excluding easily confused chars (O, 0, I, 1)
@@ -51,8 +52,10 @@ export async function GET(request: Request) {
       memberships.forEach((m) => joinedCompIds.add(m.competitionId))
     }
 
+    const prizePoolMap = await getPrizePoolForCompetitions(competitions)
     const result = competitions.map((comp) => ({
       ...comp,
+      prizePool: prizePoolMap.get(comp.id) ?? comp.prizePool,
       participantCount: comp._count.users,
       eventCount: comp._count.events,
       isJoined: joinedCompIds.has(comp.id),

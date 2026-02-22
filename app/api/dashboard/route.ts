@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
+import { getPrizePoolForCompetitions } from '@/lib/competition-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,9 +56,11 @@ export async function GET() {
     ])
 
     const joinedCompIds = new Set(memberships.map((m) => m.competitionId))
+    const prizePoolMap = await getPrizePoolForCompetitions(competitions)
 
     const comps = competitions.map((comp) => ({
       ...comp,
+      prizePool: prizePoolMap.get(comp.id) ?? comp.prizePool,
       participantCount: comp._count.users,
       eventCount: comp._count.events,
       isJoined: joinedCompIds.has(comp.id),

@@ -64,6 +64,8 @@ interface AdminCompetition {
   id: string
   name: string
   description: string | null
+  entryFee: number
+  prizePool: number
   isPublic: boolean
   status: string
   startDate: string
@@ -342,7 +344,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/competitions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: compName, description: compDescription || undefined, startDate: compStartDate, eventIds: Array.from(selectedEventIds), entryFee: compEntryFee, prizePool: compPrizePool }),
+        body: JSON.stringify({ name: compName, description: compDescription || undefined, startDate: compStartDate, eventIds: Array.from(selectedEventIds), entryFee: compEntryFee, prizePool: compEntryFee > 0 ? 0 : compPrizePool }),
       })
       if (res.ok) {
         setCreateCompSuccess('Public competition created successfully')
@@ -825,8 +827,19 @@ export default function AdminPage() {
                   <input type="number" min={0} step={1} value={compEntryFee} onChange={(e) => setCompEntryFee(Number(e.target.value) || 0)} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold mb-1.5">Prize Pool <span className="font-normal text-muted-foreground">($)</span></label>
-                  <input type="number" min={0} step={1} value={compPrizePool} onChange={(e) => setCompPrizePool(Number(e.target.value) || 0)} className={inputCls} />
+                  {compEntryFee > 0 ? (
+                    <>
+                      <label className="block text-sm font-semibold mb-1.5">Prize Pool</label>
+                      <p className="text-sm text-muted-foreground py-2">
+                        From entry fees (entrants × entry fee)
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <label className="block text-sm font-semibold mb-1.5">Prize Pool <span className="font-normal text-muted-foreground">($)</span></label>
+                      <input type="number" min={0} step={1} value={compPrizePool} onChange={(e) => setCompPrizePool(Number(e.target.value) || 0)} className={inputCls} />
+                    </>
+                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold mb-1.5">Description <span className="font-normal text-muted-foreground">(optional)</span></label>
@@ -970,6 +983,8 @@ export default function AdminPage() {
                       <th className="text-left px-6 py-3 font-semibold text-muted-foreground">Name</th>
                       <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Visibility</th>
                       <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                      <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Entry</th>
+                      <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Prize Pool</th>
                       <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Members</th>
                       <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Events</th>
                       <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Owner</th>
@@ -1000,7 +1015,7 @@ export default function AdminPage() {
                                 />
                               </div>
                             </td>
-                            <td colSpan={4} />
+                            <td colSpan={6} />
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-1">
                                 <button onClick={() => handleSaveComp(comp.id)} disabled={editCompSaving} className="p-1.5 rounded-lg text-green-500 hover:bg-green-500/10 transition-colors" title="Save">
@@ -1029,6 +1044,12 @@ export default function AdminPage() {
                                 : comp.status === 'completed' ? 'bg-muted text-muted-foreground'
                                 : 'bg-yellow-500/10 text-yellow-600'
                               }`}>{comp.status}</span>
+                            </td>
+                            <td className="px-4 py-4 text-center text-xs font-medium">
+                              {comp.entryFee > 0 ? `$${comp.entryFee}` : 'Free'}
+                            </td>
+                            <td className="px-4 py-4 text-center text-xs font-medium">
+                              ${(comp.prizePool ?? 0).toFixed(0)}
                             </td>
                             <td className="px-4 py-4 text-center">{comp._count.users}</td>
                             <td className="px-4 py-4 text-center">{comp._count.events}</td>

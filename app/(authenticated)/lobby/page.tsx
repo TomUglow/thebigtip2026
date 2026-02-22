@@ -58,6 +58,12 @@ function CompetitionRow({ competition }: { competition: Competition }) {
             <Users className="w-3.5 h-3.5" />
             <span className="font-mono">{competition.participantCount}</span>
           </div>
+          {(competition.prizePool ?? 0) > 0 && (
+            <div className="flex items-center gap-1.5 text-muted-foreground w-18">
+              <Trophy className="w-3.5 h-3.5" />
+              <span className="font-mono">${competition.prizePool?.toFixed(0) ?? 0}</span>
+            </div>
+          )}
           <span
             className={`text-[10px] w-16 text-center px-2 py-0.5 rounded-full border font-semibold ${
               competition.isPublic

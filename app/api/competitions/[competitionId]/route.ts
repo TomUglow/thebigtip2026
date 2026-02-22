@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/api-helpers'
+import { getPrizePoolForCompetition } from '@/lib/competition-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,12 +99,18 @@ export async function GET(
       return rest
     })
 
+    const displayPrizePool = await getPrizePoolForCompetition(
+      competition.id,
+      competition.entryFee,
+      competition.prizePool
+    )
+
     return NextResponse.json({
       id: competition.id,
       name: competition.name,
       description: competition.description,
       entryFee: competition.entryFee,
-      prizePool: competition.prizePool,
+      prizePool: displayPrizePool,
       startDate: competition.startDate,
       endDate: competition.endDate,
       isPublic: competition.isPublic,

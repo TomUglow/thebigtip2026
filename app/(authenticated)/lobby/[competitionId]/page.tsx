@@ -357,6 +357,19 @@ export default function CompetitionDetailPage() {
           {competition.description && (
             <p className="text-sm text-muted-foreground mt-1">{competition.description}</p>
           )}
+          {(competition.entryFee > 0 || (competition.prizePool ?? 0) > 0) && (
+            <div className="flex items-center gap-3 mt-2 text-sm">
+              {competition.entryFee > 0 && (
+                <span className="text-muted-foreground">Entry: <span className="font-semibold text-foreground">${competition.entryFee}</span></span>
+              )}
+              {(competition.prizePool ?? 0) > 0 && (
+                <span className="flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-semibold">Prize pool: ${competition.prizePool?.toFixed(0) ?? 0}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
         {currentUserIsCommissioner && (
           <button

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import type { Session } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getPrizePoolForCompetitions } from '@/lib/competition-helpers'
 import DashboardClient from './DashboardClient'
 import type { Competition } from '@/lib/types'
 
@@ -88,13 +89,14 @@ export default async function DashboardPage() {
   }
 
   const joinedCompIds = new Set(memberships.map((m) => m.competitionId))
+  const prizePoolMap = await getPrizePoolForCompetitions(competitions)
 
   const comps: Competition[] = competitions.map((comp) => ({
     id: comp.id,
     name: comp.name,
     description: comp.description,
     entryFee: comp.entryFee,
-    prizePool: comp.prizePool,
+    prizePool: prizePoolMap.get(comp.id) ?? comp.prizePool,
     startDate: comp.startDate?.toISOString() ?? new Date().toISOString(),
     endDate: comp.endDate?.toISOString() ?? new Date().toISOString(),
     isPublic: comp.isPublic,
