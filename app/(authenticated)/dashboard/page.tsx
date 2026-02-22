@@ -84,7 +84,7 @@ export default async function DashboardPage() {
     picks = results[2]
   } catch (err) {
     console.error('Dashboard DB query failed:', err)
-    return <DashboardClient {...emptyProps} userName={session?.user?.name ?? null} />
+    return <DashboardClient {...emptyProps} userName={session?.user?.name ?? null} dbError={true} />
   }
 
   const joinedCompIds = new Set(memberships.map((m) => m.competitionId))

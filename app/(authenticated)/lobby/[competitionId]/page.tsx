@@ -592,7 +592,7 @@ export default function CompetitionDetailPage() {
                             {event.options.map((option) => (
                               <option key={option} value={option}>{option}</option>
                             ))}
-                            {(event as any).allowOptionRequests && (
+                            {event.allowOptionRequests && (
                               <option value="__other__">Other...</option>
                             )}
                           </select>

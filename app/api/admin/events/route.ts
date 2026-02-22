@@ -33,6 +33,7 @@ export async function GET() {
         title: true,
         sport: true,
         options: true,
+        allowOptionRequests: true,
         eventDate: true,
         status: true,
         winner: true,

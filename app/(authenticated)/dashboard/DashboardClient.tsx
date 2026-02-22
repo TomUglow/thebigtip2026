@@ -270,6 +270,7 @@ interface DashboardClientProps {
   userRank: number | null
   leaderboard: LeaderboardEntry[]
   mainCompetitionId: string | null
+  dbError?: boolean
 }
 
 export default function DashboardClient({
@@ -279,6 +280,7 @@ export default function DashboardClient({
   userRank,
   leaderboard,
   mainCompetitionId,
+  dbError,
 }: DashboardClientProps) {
   const router = useRouter()
   const [scores, setScores] = useState<ScoreGame[]>([])
@@ -341,6 +343,17 @@ export default function DashboardClient({
 
   return (
     <>
+      {dbError && (
+        <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-3 flex items-center justify-between gap-4">
+          <p className="text-sm text-red-500 font-medium">We had trouble loading your data. Some information may be missing.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-sm font-semibold text-red-500 hover:text-red-400 underline flex-shrink-0"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
       {/* Hero Section */}
       <div className="border-b border-white/10 py-12 px-6 relative">
         <div className="absolute inset-0 pointer-events-none" />

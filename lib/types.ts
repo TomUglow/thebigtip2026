@@ -16,6 +16,7 @@ export interface Event {
   title: string | null
   sport: string
   options: string[] | null
+  allowOptionRequests: boolean
   eventDate: string
   status: string
   team1Name: string | null
