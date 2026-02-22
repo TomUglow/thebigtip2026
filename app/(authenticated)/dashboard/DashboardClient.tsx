@@ -368,14 +368,14 @@ export default function DashboardClient({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setShowJoinModal(true); setJoinError(''); setJoinCode('') }}
-                className="glass-card px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover-elevate hover:border-primary/50 transition-colors"
+                className="glass-card px-3 py-2 rounded-lg text-sm font-semibold flex items-left gap-2 hover-elevate hover:border-foreground/50 transition-colors"
               >
                 <Lock className="w-4 h-4" />
                 Join Private League
               </button>
               <Link
                 href="/lobby/create"
-                className="glass-button px-3 py-2 rounded-lg text-white text-sm font-semibold flex items-center gap-2 hover-elevate hover:bg-card/50 hover:text-primary transition-colors"
+                className="glass-button px-3 py-2 rounded-lg text-white text-sm font-semibold flex items-left gap-2 hover-elevate hover:bg-card/50 hover:text-primary transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Create Private League
