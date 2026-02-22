@@ -29,8 +29,8 @@ export default function LandingPage() {
                   Sports Expert
                 </h1>
                 <p className="text-primary-foreground text-lg text-muted-foreground max-w-md">
-                  Create private leagues, challenge your mates, and track your tipping
-                  performance across the season. 50+ events.
+                  Create private leagues, challenge your mates, and track your
+                  performance across over 50+ events.
                 </p>
               </div>
 
@@ -89,8 +89,8 @@ export default function LandingPage() {
             />
             <FeatureCard
               icon={<Users className="w-12 h-12" style={{ color: '#D32F2F' }} />}
-              title="Global Community"
-              description="Compete worldwide in public leagues or keep it local."
+              title="Sport Loving Community"
+              description="Compete in public leagues or keep it local."
             />
           </div>
         </div>
