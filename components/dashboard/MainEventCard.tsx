@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Users, Target, Clock } from 'lucide-react'
+import EntryFeeCheckoutModal from '@/components/checkout/EntryFeeCheckoutModal'
 import type { Competition } from '@/lib/types'
 
 function CountdownTimer({ targetDate }: { targetDate: string }) {
@@ -66,6 +67,7 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
   const router = useRouter()
   const [fetchedCompetitions, setFetchedCompetitions] = useState<Competition[]>([])
   const [joining, setJoining] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
 
   useEffect(() => {
     if (externalCompetitions) return
@@ -87,7 +89,11 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
     return 'leaderboard'
   }
 
-  const handleEnterNow = async (competitionId: string) => {
+  const handleEnterNow = async (competitionId: string, entryFee: number) => {
+    if (entryFee > 0) {
+      setCheckoutOpen(true)
+      return
+    }
     setJoining(true)
     try {
       const res = await fetch('/api/competitions/join', {
@@ -103,6 +109,11 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
     } finally {
       setJoining(false)
     }
+  }
+
+  const handleCheckoutSuccess = () => {
+    setCheckoutOpen(false)
+    if (mainCompetition) router.push(`/lobby/${mainCompetition.id}`)
   }
 
   if (!mainCompetition) {
@@ -137,9 +148,13 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
               >
                 Main Event
               </span>
-              {mainCompetition.entryFee === 0 && (
+              {mainCompetition.entryFee === 0 ? (
                 <span className="text-[10px] px-2.5 py-0.5 rounded border border-border text-muted-foreground font-semibold">
                   Free Entry
+                </span>
+              ) : (
+                <span className="text-[10px] px-2.5 py-0.5 rounded border border-border text-muted-foreground font-semibold">
+                  ${mainCompetition.entryFee} entry
                 </span>
               )}
             </div>
@@ -173,13 +188,25 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
             </div>
 
             {state === 'enter' && (
-              <button
-                onClick={() => handleEnterNow(mainCompetition.id)}
-                disabled={joining}
-                className="brand-gradient text-white text-sm font-bold px-6 py-2.5 rounded-lg hover-elevate disabled:opacity-50"
-              >
-                {joining ? 'Entering...' : 'Enter Now'}
-              </button>
+              <>
+                <button
+                  onClick={() => handleEnterNow(mainCompetition.id, mainCompetition.entryFee)}
+                  disabled={joining}
+                  className="brand-gradient text-white text-sm font-bold px-6 py-2.5 rounded-lg hover-elevate disabled:opacity-50"
+                >
+                  {joining ? 'Entering...' : mainCompetition.entryFee > 0 ? `Pay $${mainCompetition.entryFee} to Enter` : 'Enter Now'}
+                </button>
+                {checkoutOpen && (
+                  <EntryFeeCheckoutModal
+                    isOpen={checkoutOpen}
+                    onClose={() => setCheckoutOpen(false)}
+                    onSuccess={handleCheckoutSuccess}
+                    competitionId={mainCompetition.id}
+                    competitionName={mainCompetition.name}
+                    amount={mainCompetition.entryFee}
+                  />
+                )}
+              </>
             )}
             {state === 'edit' && (
               <button

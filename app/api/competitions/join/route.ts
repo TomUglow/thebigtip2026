@@ -39,6 +39,28 @@ export async function POST(request: Request) {
       )
     }
 
+    // Paid competitions require payment before joining
+    if (competition.entryFee > 0) {
+      const existing = await prisma.competitionUser.findUnique({
+        where: {
+          userId_competitionId: { userId: session.user.id, competitionId },
+        },
+      })
+      if (existing) {
+        return NextResponse.json({ success: true, competitionId })
+      }
+      return NextResponse.json(
+        {
+          error: 'Payment required',
+          requiresPayment: true,
+          competitionId,
+          amount: competition.entryFee,
+          currency: 'AUD',
+        },
+        { status: 402 }
+      )
+    }
+
     // Create membership (upsert to handle duplicates gracefully)
     await prisma.competitionUser.upsert({
       where: {
