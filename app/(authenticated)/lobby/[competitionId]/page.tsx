@@ -13,12 +13,14 @@ import { SPORT_COLORS } from '@/lib/constants'
 import type { Event, Competition, LeaderboardEntry } from '@/lib/types'
 import EventRequestModal from '@/components/EventRequestModal'
 import PendingRequestsSection from '@/components/PendingRequestsSection'
+import OptionRequestModal from '@/components/OptionRequestModal'
 
 interface UserPick {
   id: string
   eventId: string
   competitionId: string
   selectedTeam: string
+  isPending: boolean
   isCorrect: boolean | null
   points: number
 }
@@ -53,6 +55,11 @@ export default function CompetitionDetailPage() {
 
   // Event request modal
   const [showEventRequestModal, setShowEventRequestModal] = useState(false)
+
+  // Option request modal (for open-ended event options)
+  const [showOptionRequestModal, setShowOptionRequestModal] = useState(false)
+  const [optionRequestEventId, setOptionRequestEventId] = useState<string | null>(null)
+  const [optionRequestEventTitle, setOptionRequestEventTitle] = useState('')
 
   // Commissioner management state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
@@ -138,12 +145,12 @@ export default function CompetitionDetailPage() {
     const existingIdx = userPicks.findIndex((p) => p.eventId === eventId)
     if (existingIdx >= 0) {
       setUserPicks((prev) =>
-        prev.map((p) => (p.eventId === eventId ? { ...p, selectedTeam } : p))
+        prev.map((p) => (p.eventId === eventId ? { ...p, selectedTeam, isPending: false } : p))
       )
     } else {
       setUserPicks((prev) => [
         ...prev,
-        { id: `temp-${eventId}`, eventId, competitionId, selectedTeam, isCorrect: null, points: 0 },
+        { id: `temp-${eventId}`, eventId, competitionId, selectedTeam, isPending: false, isCorrect: null, points: 0 },
       ])
     }
 
@@ -190,6 +197,46 @@ export default function CompetitionDetailPage() {
       setPrefilling(false)
       setShowPrefillModal(false)
       setSelectedSourceComp('')
+    }
+  }
+
+  const handleOptionRequest = async (eventId: string, suggestedOption: string) => {
+    if (!suggestedOption || isLocked) return
+
+    const previousPicks = [...userPicks]
+    const existingIdx = userPicks.findIndex((p) => p.eventId === eventId)
+    if (existingIdx >= 0) {
+      setUserPicks((prev) =>
+        prev.map((p) => (p.eventId === eventId ? { ...p, selectedTeam: suggestedOption, isPending: true } : p))
+      )
+    } else {
+      setUserPicks((prev) => [
+        ...prev,
+        { id: `temp-${eventId}`, eventId, competitionId, selectedTeam: suggestedOption, isPending: true, isCorrect: null, points: 0 },
+      ])
+    }
+
+    try {
+      const res = await fetch('/api/option-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, competitionId, suggestedOption }),
+      })
+      if (!res.ok) {
+        setUserPicks(previousPicks)
+      } else {
+        const data = await res.json()
+        setUserPicks((prev) =>
+          prev.map((p) =>
+            p.eventId === eventId
+              ? { ...p, id: data.pick.id, selectedTeam: data.pick.selectedTeam, isPending: true }
+              : p
+          )
+        )
+      }
+    } catch (error) {
+      console.error('Error submitting option request:', error)
+      setUserPicks(previousPicks)
     }
   }
 
@@ -469,10 +516,10 @@ export default function CompetitionDetailPage() {
                 return (
                   <div
                     key={event.id}
-                    className={`flex items-center gap-3 px-4 py-3 ${!isLast ? 'border-b border-border' : ''}`}
+                    className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 py-3 ${!isLast ? 'border-b border-border' : ''}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate">{event.title}</div>
+                      <div className="text-sm font-semibold">{event.title}</div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span
                           className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0"
@@ -486,34 +533,48 @@ export default function CompetitionDetailPage() {
                       </div>
                     </div>
 
-                    {event.options && event.options.length > 0 ? (
-                      isLocked ? (
+                    {event.options && event.options.length > 0 ? (() => {
+                      const isPendingPick = pickData?.isPending ?? false
+                      return isLocked ? (
                         // View-only pick display
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:flex-shrink-0">
                           {userPick ? (
                             <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                              isCorrect === true
+                              isPendingPick
+                                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                                : isCorrect === true
                                 ? 'bg-green-500/10 border-green-500/40 text-green-400'
                                 : isCorrect === false
                                 ? 'bg-red-500/10 border-red-500/40 text-red-400'
                                 : 'bg-muted/50 border-border text-foreground'
                             }`}>
                               {userPick}
+                              {isPendingPick && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide opacity-80">Pending</span>}
                             </span>
                           ) : (
                             <span className="text-xs text-muted-foreground italic">No pick</span>
                           )}
-                          {isCorrect === true && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
-                          {isCorrect === false && <X className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                          {!isPendingPick && isCorrect === true && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                          {!isPendingPick && isCorrect === false && <X className="w-4 h-4 text-red-500 flex-shrink-0" />}
                         </div>
                       ) : (
                         // Interactive select
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:flex-shrink-0">
                           <select
-                            value={userPick || ''}
-                            onChange={(e) => handlePickTeam(event.id, e.target.value)}
-                            className={`w-44 p-2 rounded-lg border text-sm font-semibold appearance-none cursor-pointer transition-all focus:outline-none focus:border-primary ${
-                              userPick
+                            value={isPendingPick ? '__pending__' : (userPick || '')}
+                            onChange={(e) => {
+                              if (e.target.value === '__other__') {
+                                setOptionRequestEventId(event.id)
+                                setOptionRequestEventTitle(event.title || 'this event')
+                                setShowOptionRequestModal(true)
+                              } else {
+                                handlePickTeam(event.id, e.target.value)
+                              }
+                            }}
+                            className={`w-full sm:w-44 p-2 rounded-lg border text-sm font-semibold appearance-none cursor-pointer transition-all focus:outline-none focus:border-primary ${
+                              isPendingPick
+                                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                                : userPick
                                 ? 'bg-green-500/10 border-green-500/40 text-green-400'
                                 : 'bg-muted/30 border-border hover:border-foreground/30'
                             }`}
@@ -524,14 +585,24 @@ export default function CompetitionDetailPage() {
                             }}
                           >
                             <option value="">Select pick...</option>
+                            {/* Show the pending option as a non-selectable placeholder */}
+                            {isPendingPick && (
+                              <option value="__pending__" disabled>{userPick} (Pending)</option>
+                            )}
                             {event.options.map((option) => (
                               <option key={option} value={option}>{option}</option>
                             ))}
+                            {(event as any).allowOptionRequests && (
+                              <option value="__other__">Other...</option>
+                            )}
                           </select>
-                          {userPick && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
+                          {isPendingPick && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400 flex-shrink-0">Pending</span>
+                          )}
+                          {!isPendingPick && userPick && <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />}
                         </div>
                       )
-                    ) : (
+                    })() : (
                       <span className="text-xs text-muted-foreground flex-shrink-0">No options</span>
                     )}
                   </div>
@@ -747,6 +818,19 @@ export default function CompetitionDetailPage() {
         competitionId={competitionId}
         isOpen={showEventRequestModal}
         onClose={() => setShowEventRequestModal(false)}
+      />
+
+      {/* Option request modal */}
+      <OptionRequestModal
+        isOpen={showOptionRequestModal}
+        eventTitle={optionRequestEventTitle}
+        onSubmit={(suggestedOption) => {
+          setShowOptionRequestModal(false)
+          if (optionRequestEventId) {
+            handleOptionRequest(optionRequestEventId, suggestedOption)
+          }
+        }}
+        onClose={() => setShowOptionRequestModal(false)}
       />
 
       {/* Delete competition confirmation modal */}

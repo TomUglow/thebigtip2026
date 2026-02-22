@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic'
 const updateEventSchema = z.object({
   title: z.string().min(1).optional(),
   sport: z.string().min(1).optional(),
+  options: z.array(z.string().min(1)).min(2).optional(),
+  allowOptionRequests: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -36,7 +38,7 @@ export async function PATCH(
     const updated = await prisma.event.update({
       where: { id: eventId },
       data: result.data,
-      select: { id: true, title: true, sport: true },
+      select: { id: true, title: true, sport: true, options: true, allowOptionRequests: true },
     })
 
     return apiSuccess(updated)

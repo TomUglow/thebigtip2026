@@ -43,11 +43,21 @@ interface AdminEvent {
   title: string | null
   sport: string
   options: string[] | null
+  allowOptionRequests: boolean
   eventDate: string
   status: string
   winner: string | null
   score: string | null
   _count: { picks: number; competitions: number }
+}
+
+interface AdminOptionRequest {
+  id: string
+  suggestedOption: string
+  createdAt: string
+  event: { id: string; title: string | null; sport: string }
+  user: { id: string; name: string | null; email: string }
+  competition: { id: string; name: string }
 }
 
 interface AdminCompetition {
@@ -105,6 +115,8 @@ export default function AdminPage() {
   const [editingEvent, setEditingEvent] = useState<string | null>(null)
   const [editEventTitle, setEditEventTitle] = useState('')
   const [editEventSport, setEditEventSport] = useState('')
+  const [editEventOptions, setEditEventOptions] = useState('')
+  const [editEventAllowOptionRequests, setEditEventAllowOptionRequests] = useState(false)
   const [editEventSaving, setEditEventSaving] = useState(false)
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<string | null>(null)
 
@@ -151,6 +163,12 @@ export default function AdminPage() {
   const [requests, setRequests] = useState<AdminNotification[]>([])
   const [requestsLoading, setRequestsLoading] = useState(false)
   const [dismissingRequest, setDismissingRequest] = useState<string | null>(null)
+
+  // Option requests
+  const [optionRequests, setOptionRequests] = useState<AdminOptionRequest[]>([])
+  const [optionRequestsLoading, setOptionRequestsLoading] = useState(false)
+  const [editingOptionText, setEditingOptionText] = useState<Record<string, string>>({})
+  const [optionRequestActionLoading, setOptionRequestActionLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (session && !session.user.isAdmin) router.push('/dashboard')
@@ -209,11 +227,29 @@ export default function AdminPage() {
     }
   }, [])
 
+  const fetchOptionRequests = useCallback(async () => {
+    setOptionRequestsLoading(true)
+    try {
+      const res = await fetch('/api/admin/option-requests')
+      if (res.ok) {
+        const data = await res.json()
+        const list: AdminOptionRequest[] = Array.isArray(data) ? data : []
+        setOptionRequests(list)
+        // Pre-fill editing text with the suggested options
+        const initText: Record<string, string> = {}
+        list.forEach((r) => { initText[r.id] = r.suggestedOption })
+        setEditingOptionText(initText)
+      }
+    } finally {
+      setOptionRequestsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (activeTab === 'members') fetchUsers()
     if (activeTab === 'events' || activeTab === 'results') fetchEvents()
     if (activeTab === 'competitions') { fetchCompetitions(); fetchEvents() }
-    if (activeTab === 'requests') fetchRequests()
+    if (activeTab === 'requests') { fetchRequests(); fetchOptionRequests() }
   }, [activeTab, fetchUsers, fetchEvents, fetchCompetitions, fetchRequests])
 
   // ── Members ──────────────────────────────────────────────────────────────
@@ -265,18 +301,21 @@ export default function AdminPage() {
     setEditingEvent(event.id)
     setEditEventTitle(event.title || '')
     setEditEventSport(event.sport)
+    setEditEventOptions(event.options?.join('\n') ?? '')
+    setEditEventAllowOptionRequests(event.allowOptionRequests)
   }
 
   const handleSaveEvent = async (eventId: string) => {
     setEditEventSaving(true)
+    const parsedOptions = editEventOptions.split('\n').map((o) => o.trim()).filter(Boolean)
     try {
       const res = await fetch(`/api/admin/events/${eventId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editEventTitle, sport: editEventSport }),
+        body: JSON.stringify({ title: editEventTitle, sport: editEventSport, options: parsedOptions, allowOptionRequests: editEventAllowOptionRequests }),
       })
       if (res.ok) {
-        setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, title: editEventTitle, sport: editEventSport } : e))
+        setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, title: editEventTitle, sport: editEventSport, options: parsedOptions, allowOptionRequests: editEventAllowOptionRequests } : e))
         setEditingEvent(null)
       }
     } finally { setEditEventSaving(false) }
@@ -358,6 +397,25 @@ export default function AdminPage() {
     } finally { setResultLoading((prev) => ({ ...prev, [eventId]: false })) }
   }
 
+  // ── Option Requests ───────────────────────────────────────────────────────
+  const handleOptionRequestAction = async (requestId: string, action: 'approve' | 'reject') => {
+    setOptionRequestActionLoading((prev) => ({ ...prev, [requestId]: true }))
+    try {
+      const correctedOption = editingOptionText[requestId]
+      const res = await fetch(`/api/admin/option-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, correctedOption: correctedOption || undefined }),
+      })
+      if (res.ok) {
+        setOptionRequests((prev) => prev.filter((r) => r.id !== requestId))
+        if (action === 'approve') fetchEvents()
+      }
+    } finally {
+      setOptionRequestActionLoading((prev) => ({ ...prev, [requestId]: false }))
+    }
+  }
+
   // ── Requests ──────────────────────────────────────────────────────────────
   const handleDismissRequest = async (notificationId: string) => {
     setDismissingRequest(notificationId)
@@ -405,7 +463,7 @@ export default function AdminPage() {
     })
   }
 
-  const unreadRequestCount = requests.filter((r) => !r.read).length
+  const unreadRequestCount = requests.filter((r) => !r.read).length + optionRequests.length
 
   const tabs: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'members', label: 'Members', icon: Users },
@@ -633,29 +691,46 @@ export default function AdminPage() {
                       <tr key={event.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                         {editingEvent === event.id ? (
                           <>
-                            <td className="px-4 py-3" colSpan={2}>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={editEventTitle}
-                                  onChange={(e) => setEditEventTitle(e.target.value)}
-                                  className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                  placeholder="Title"
-                                  autoFocus
-                                />
-                                <select
-                                  value={editEventSport}
-                                  onChange={(e) => setEditEventSport(e.target.value)}
-                                  className="px-2 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                >
-                                  {SPORTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                            <td className="px-4 py-3" colSpan={7}>
+                              <div className="space-y-2">
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={editEventTitle}
+                                    onChange={(e) => setEditEventTitle(e.target.value)}
+                                    className="flex-1 px-2 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    placeholder="Title"
+                                    autoFocus
+                                  />
+                                  <select
+                                    value={editEventSport}
+                                    onChange={(e) => setEditEventSport(e.target.value)}
+                                    className="px-2 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  >
+                                    {SPORTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Pick options <span className="font-normal">(one per line)</span></label>
+                                  <textarea
+                                    value={editEventOptions}
+                                    onChange={(e) => setEditEventOptions(e.target.value)}
+                                    rows={3}
+                                    className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                                    placeholder={"Option A\nOption B"}
+                                  />
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={editEventAllowOptionRequests}
+                                    onChange={(e) => setEditEventAllowOptionRequests(e.target.checked)}
+                                    className="w-4 h-4 rounded border-border accent-primary"
+                                  />
+                                  <span className="text-xs font-semibold text-muted-foreground">Allow users to request unlisted options</span>
+                                </label>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                              {new Date(event.eventDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </td>
-                            <td colSpan={4} />
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-1">
                                 <button onClick={() => handleSaveEvent(event.id)} disabled={editEventSaving} className="p-1.5 rounded-lg text-green-500 hover:bg-green-500/10 transition-colors" title="Save">
@@ -669,9 +744,14 @@ export default function AdminPage() {
                           </>
                         ) : (
                           <>
-                            <td className="px-6 py-4 font-medium max-w-[180px] truncate">{event.title || '—'}</td>
+                            <td className="px-6 py-4 font-medium max-w-[200px]">
+                              <div className="truncate">{event.title || '—'}</div>
+                              {event.allowOptionRequests && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-400">Open options</span>
+                              )}
+                            </td>
                             <td className="px-4 py-4">
-                              <span className="text-xs font-semibold px-2 py-1 rounded-full text-white" style={{ backgroundColor: SPORT_COLORS[event.sport] || '#6b7280' }}>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: `${SPORT_COLORS[event.sport] || '#6b7280'}20`, color: SPORT_COLORS[event.sport] || '#6b7280' }}>
                                 {event.sport}
                               </span>
                             </td>
@@ -828,19 +908,19 @@ export default function AdminPage() {
                                 {isSelected && <Check className="w-3 h-3 text-white" />}
                               </div>
 
-                              {/* Sport badge */}
-                              <span
-                                className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0 min-w-[80px] text-center"
-                                style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
-                              >
-                                {event.sport}
-                              </span>
-
                               {/* Event info */}
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold truncate">{event.title || `${event.sport} Event`}</div>
-                                <div className="text-[11px] text-muted-foreground">
-                                  {format(new Date(event.eventDate), 'd MMM yyyy')}
+                                <div className="text-sm font-semibold">{event.title || `${event.sport} Event`}</div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span
+                                    className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex-shrink-0"
+                                    style={{ backgroundColor: `${sportColor}20`, color: sportColor }}
+                                  >
+                                    {event.sport}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {format(new Date(event.eventDate), 'd MMM yyyy')}
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -997,7 +1077,7 @@ export default function AdminPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{event.title || `${event.sport} Event`}</div>
                     <div className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: SPORT_COLORS[event.sport] || '#6b7280' }}>{event.sport}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: `${SPORT_COLORS[event.sport] || '#6b7280'}20`, color: SPORT_COLORS[event.sport] || '#6b7280' }}>{event.sport}</span>
                       {new Date(event.eventDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} · {event._count.picks} picks
                     </div>
                   </div>
@@ -1030,7 +1110,92 @@ export default function AdminPage() {
       )}
       {/* ── REQUESTS TAB ────────────────────────────────────────────────── */}
       {activeTab === 'requests' && (
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="space-y-6">
+
+          {/* Option Requests section */}
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  Pending Pick Options
+                  {optionRequests.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">{optionRequests.length}</span>
+                  )}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Users have suggested unlisted options for open-ended events. Edit spelling if needed, then approve or reject.</p>
+              </div>
+              <button onClick={fetchOptionRequests} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {optionRequestsLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading...
+              </div>
+            ) : optionRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+                <CheckCircle2 className="w-8 h-8 opacity-30" />
+                <p className="font-semibold text-sm">No pending option requests</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {optionRequests.map((req) => {
+                  const sportColor = SPORT_COLORS[req.event.sport] || '#6b7280'
+                  const isLoading = optionRequestActionLoading[req.id]
+                  return (
+                    <div key={req.id} className="px-6 py-4 flex flex-col md:flex-row md:items-center gap-4">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: `${sportColor}20`, color: sportColor }}>
+                            {req.event.sport}
+                          </span>
+                          <span className="font-semibold text-sm truncate">{req.event.title || 'Unnamed event'}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Competition: <span className="font-medium text-foreground">{req.competition.name}</span>
+                          {' · '}
+                          By: <span className="font-medium text-foreground">{req.user.name || req.user.email}</span>
+                          {' · '}
+                          {new Date(req.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <label className="text-xs font-semibold text-muted-foreground shrink-0">Suggested option:</label>
+                          <input
+                            type="text"
+                            value={editingOptionText[req.id] ?? req.suggestedOption}
+                            onChange={(e) => setEditingOptionText((prev) => ({ ...prev, [req.id]: e.target.value }))}
+                            className="flex-1 px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/5 text-sm font-semibold text-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleOptionRequestAction(req.id, 'approve')}
+                          disabled={isLoading || !editingOptionText[req.id]?.trim()}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg font-semibold text-sm hover:bg-green-600 disabled:opacity-50 transition-colors"
+                        >
+                          {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleOptionRequestAction(req.id, 'reject')}
+                          disabled={isLoading}
+                          className="flex items-center gap-1.5 px-4 py-2 border border-border rounded-lg font-semibold text-sm text-muted-foreground hover:text-red-500 hover:border-red-500/30 hover:bg-red-500/5 disabled:opacity-50 transition-colors"
+                        >
+                          {isLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Platform Event Requests section */}
+          <div className="glass-card rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
               <h2 className="font-bold text-lg">Platform Event Requests</h2>
@@ -1124,6 +1289,7 @@ export default function AdminPage() {
               })}
             </div>
           )}
+          </div>
         </div>
       )}
     </div>

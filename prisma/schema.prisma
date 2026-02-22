@@ -28,6 +28,7 @@ model User {
   payments         Payment[]
   notifications    Notification[]
   messages         Message[]
+  optionRequests   OptionRequest[]
 }
 
 model Competition {
@@ -46,11 +47,12 @@ model Competition {
   updatedAt   DateTime           @updatedAt
   ownerId     String
   owner       User               @relation("CompetitionOwner", fields: [ownerId], references: [id])
-  events      CompetitionEvent[]
-  users       CompetitionUser[]
-  payments    Payment[]
-  picks       Pick[]
-  messages    Message[]
+  events         CompetitionEvent[]
+  users          CompetitionUser[]
+  payments       Payment[]
+  picks          Pick[]
+  messages       Message[]
+  optionRequests OptionRequest[]
 }
 
 model CompetitionUser {
@@ -68,27 +70,29 @@ model CompetitionUser {
 }
 
 model Event {
-  id           String             @id @default(cuid())
-  eventNumber  Int?
-  title        String?
-  sport        String
-  options      Json?
-  team1Name    String?
-  team1Abbr    String?
-  team1Odds    String?
-  team2Name    String?
-  team2Abbr    String?
-  team2Odds    String?
-  eventDate    DateTime
-  status       String             @default("upcoming")
-  winner       String?
-  score        String?
-  externalId   String?            @unique
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  competitions CompetitionEvent[]
-  picks        Pick[]
-  oddsSnapshots OddsSnapshot[]
+  id                  String             @id @default(cuid())
+  eventNumber         Int?
+  title               String?
+  sport               String
+  options             Json?
+  allowOptionRequests Boolean            @default(false)
+  team1Name           String?
+  team1Abbr           String?
+  team1Odds           String?
+  team2Name           String?
+  team2Abbr           String?
+  team2Odds           String?
+  eventDate           DateTime
+  status              String             @default("upcoming")
+  winner              String?
+  score               String?
+  externalId          String?            @unique
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  competitions        CompetitionEvent[]
+  picks               Pick[]
+  oddsSnapshots       OddsSnapshot[]
+  optionRequests      OptionRequest[]
 }
 
 model CompetitionEvent {
@@ -107,6 +111,7 @@ model Pick {
   eventId       String
   competitionId String
   selectedTeam  String
+  isPending     Boolean     @default(false)
   isCorrect     Boolean?
   points        Int         @default(0)
   createdAt     DateTime    @default(now())
@@ -178,6 +183,27 @@ model Message {
   user          User        @relation(fields: [userId], references: [id])
 
   @@index([competitionId, createdAt])
+}
+
+// User-suggested picks for open-ended events awaiting admin approval
+model OptionRequest {
+  id              String      @id @default(cuid())
+  eventId         String
+  event           Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitionId   String
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  suggestedOption String
+  status          String      @default("pending")  // "pending" | "approved" | "rejected"
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([status])
+  @@index([eventId])
+  @@index([userId])
 }
 
 // User notifications and alerts

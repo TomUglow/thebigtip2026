@@ -29,6 +29,7 @@ export async function GET(request: Request) {
         eventId: true,
         competitionId: true,
         selectedTeam: true,
+        isPending: true,
         isCorrect: true,
         points: true,
         createdAt: true,
@@ -108,17 +109,24 @@ export async function POST(request: Request) {
       return apiError('Event has already started', 400)
     }
 
-    // Upsert pick scoped to this competition
-    const pick = await prisma.pick.upsert({
-      where: {
-        userId_eventId_competitionId: {
-          userId,
-          eventId,
-          competitionId,
+    // Upsert pick scoped to this competition, clearing any pending state
+    const pick = await prisma.$transaction(async (tx) => {
+      // If there's a pending option request for this pick, cancel it
+      await tx.optionRequest.deleteMany({
+        where: { userId, eventId, competitionId, status: 'pending' },
+      })
+
+      return tx.pick.upsert({
+        where: {
+          userId_eventId_competitionId: {
+            userId,
+            eventId,
+            competitionId,
+          },
         },
-      },
-      update: { selectedTeam },
-      create: { userId, eventId, competitionId, selectedTeam },
+        update: { selectedTeam, isPending: false },
+        create: { userId, eventId, competitionId, selectedTeam, isPending: false },
+      })
     })
 
     return apiSuccess(pick, 201)

@@ -35,6 +35,7 @@ export async function GET(
                         eventId: true,
                         competitionId: true,
                         selectedTeam: true,
+                        isPending: true,
                         isCorrect: true,
                         points: true,
                       },
