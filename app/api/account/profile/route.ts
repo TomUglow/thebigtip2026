@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { updateProfileSchema } from '@/lib/validations'
+import { updateProfileSchema, normaliseMobile } from '@/lib/validations'
 import { apiError, apiSuccess, requireAuth } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -73,12 +73,22 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (data.mobile) {
+      const normalisedMobile = normaliseMobile(data.mobile)
+      const existingMobile = await prisma.user.findUnique({
+        where: { mobile: normalisedMobile },
+      })
+      if (existingMobile && existingMobile.id !== userId) {
+        return apiError('Mobile number already associated with another account', 409)
+      }
+    }
+
     // Update user
     const updateData: any = {}
     if (data.username) updateData.username = data.username.toLowerCase()
     if (data.email) updateData.email = data.email.toLowerCase()
     if (data.name !== undefined) updateData.name = data.name || null
-    if (data.mobile !== undefined) updateData.mobile = data.mobile || null
+    if (data.mobile !== undefined) updateData.mobile = data.mobile ? normaliseMobile(data.mobile) : null
     if (data.postcode !== undefined) updateData.postcode = data.postcode || null
 
     const updatedUser = await prisma.user.update({

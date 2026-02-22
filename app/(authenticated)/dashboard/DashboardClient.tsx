@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { format, differenceInHours, differenceInMinutes, differenceInDays } from 'date-fns'
 import {
   Trophy, Target, TrendingUp, Calendar, CheckCircle2, Circle, Users, Plus, Lock, X,
-  ChevronLeft, ChevronRight, Globe,
+  ChevronLeft, ChevronRight, Globe, ShieldAlert,
 } from 'lucide-react'
 import { SPORT_COLORS } from '@/lib/constants'
 import type { ScoreGame, Competition } from '@/lib/types'
@@ -290,6 +290,7 @@ export default function DashboardClient({
   const [joinCode, setJoinCode] = useState('')
   const [joiningByCode, setJoiningByCode] = useState(false)
   const [joinError, setJoinError] = useState('')
+  const [showMfaBanner, setShowMfaBanner] = useState(false)
 
   useEffect(() => {
     // Check profile completion
@@ -308,6 +309,16 @@ export default function DashboardClient({
       .then((r) => r.json())
       .then((d) => setScores(Array.isArray(d) ? d : []))
       .catch(() => {})
+
+    // Show MFA banner if not enabled and not dismissed this session
+    if (!sessionStorage.getItem('mfaBannerDismissed')) {
+      fetch('/api/account/mfa')
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data && !data.mfaEnabled) setShowMfaBanner(true)
+        })
+        .catch(() => {})
+    }
   }, [])
 
   const handleJoinByCode = async () => {
@@ -351,6 +362,26 @@ export default function DashboardClient({
             className="text-sm font-semibold text-red-500 hover:text-red-400 underline flex-shrink-0"
           >
             Refresh
+          </button>
+        </div>
+      )}
+      {showMfaBanner && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              Secure your account with two-factor authentication.{' '}
+              <a href="/account?tab=security" className="underline font-semibold hover:opacity-80">
+                Set up 2FA
+              </a>
+            </p>
+          </div>
+          <button
+            onClick={() => { sessionStorage.setItem('mfaBannerDismissed', '1'); setShowMfaBanner(false) }}
+            className="text-amber-600 dark:text-amber-400 hover:opacity-70 flex-shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}

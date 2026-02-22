@@ -15,8 +15,10 @@ model User {
   name             String?
   password         String
   avatar           String?
-  mobile           String?
+  mobile           String?           @unique
   postcode         String?
+  ageVerified      Boolean           @default(false)
+  termsAcceptedAt  DateTime?
   profileCompleted Boolean           @default(false)
   isAdmin          Boolean           @default(false)
   createdAt        DateTime          @default(now())

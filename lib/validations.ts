@@ -26,15 +26,30 @@ export const registerSchema = z.object({
   username: usernameSchema,
   email: emailSchema,
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  name: z.string().optional(),
-  mobile: z.string().optional(),
-  postcode: z.string().optional(),
+  name: z.string().min(2, 'Full name is required'),
+  mobile: z
+    .string()
+    .regex(/^04\d{8}$/, 'Enter a valid Australian mobile (04XXXXXXXX)'),
+  postcode: z
+    .string()
+    .regex(/^\d{4}$/, 'Enter a valid 4-digit Australian postcode'),
+  ageVerified: z.literal(true, {
+    errorMap: () => ({ message: 'You must confirm you are 18 or over' }),
+  }),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Terms & Conditions' }),
+  }),
   favoriteTeams: z
     .array(z.object({ sport: z.string(), team: z.string() }))
     .optional(),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>
+
+// Australian mobile normalisation helper (strips spaces/formatting)
+export function normaliseMobile(mobile: string): string {
+  return mobile.replace(/\s/g, '')
+}
 
 // Profile update validation
 export const updateProfileSchema = z.object({

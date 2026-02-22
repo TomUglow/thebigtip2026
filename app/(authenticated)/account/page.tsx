@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Edit2, Save, X, Upload, ChevronDown, ShieldCheck, ShieldOff } from 'lucide-react'
 import Link from 'next/link'
 
@@ -32,7 +32,11 @@ const SPORTS_DATA: Record<string, string[]> = {
 export default function AccountPage() {
   const { data: session, update: updateSession } = useSession()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState('profile')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab')
+    return tab === 'security' || tab === 'sports' ? tab : 'profile'
+  })
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [favoriteTeams, setFavoriteTeams] = useState<FavoriteTeam[]>([])
   const [loading, setLoading] = useState(true)

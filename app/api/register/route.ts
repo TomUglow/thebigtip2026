@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { registerSchema } from '@/lib/validations'
+import { registerSchema, normaliseMobile } from '@/lib/validations'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     }
 
     const data = result.data
+    const normalisedMobile = normaliseMobile(data.mobile)
 
     // Check if email already exists
     const existingEmail = await prisma.user.findUnique({
@@ -37,6 +38,15 @@ export async function POST(request: Request) {
       return apiError('Username is already taken', 409)
     }
 
+    // Check if mobile already exists
+    const existingMobile = await prisma.user.findUnique({
+      where: { mobile: normalisedMobile },
+    })
+
+    if (existingMobile) {
+      return apiError('An account with this mobile number already exists', 409)
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10)
 
@@ -46,10 +56,12 @@ export async function POST(request: Request) {
         username: data.username.toLowerCase(),
         email: data.email.toLowerCase(),
         password: hashedPassword,
-        name: data.name || null,
-        mobile: data.mobile || null,
-        postcode: data.postcode || null,
-        // Create favorite teams if provided
+        name: data.name,
+        mobile: normalisedMobile,
+        postcode: data.postcode,
+        ageVerified: true,
+        termsAcceptedAt: new Date(),
+        profileCompleted: true,
         favoriteTeams: {
           create: (data.favoriteTeams || []).map((team) => ({
             sport: team.sport,
@@ -73,4 +85,3 @@ export async function POST(request: Request) {
     return apiError('Something went wrong', 500)
   }
 }
-
