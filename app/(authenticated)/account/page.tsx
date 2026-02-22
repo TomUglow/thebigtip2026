@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Edit2, Save, X, Upload, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Edit2, Save, X, Upload, ChevronDown, ShieldCheck, ShieldOff } from 'lucide-react'
 import Link from 'next/link'
 
 interface UserProfile {
@@ -45,6 +45,15 @@ export default function AccountPage() {
   const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' })
   const [expandedSports, setExpandedSports] = useState<Set<string>>(new Set())
 
+  // MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false)
+  const [mfaLoading, setMfaLoading] = useState(false)
+  const [mfaStep, setMfaStep] = useState<'idle' | 'setup' | 'disable'>('idle')
+  const [mfaQrCode, setMfaQrCode] = useState('')
+  const [mfaSecret, setMfaSecret] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaPassword, setMfaPassword] = useState('')
+
   const updateEditValue = (field: string, value: string) => {
     setEditValues((prev) => ({ ...prev, [field]: value }))
   }
@@ -79,8 +88,95 @@ export default function AccountPage() {
 
     if (session) {
       fetchProfile()
+      fetchMfaStatus()
     }
   }, [session])
+
+  const fetchMfaStatus = async () => {
+    try {
+      const res = await fetch('/api/account/mfa')
+      if (res.ok) {
+        const data = await res.json()
+        setMfaEnabled(data.mfaEnabled)
+      }
+    } catch (error) {
+      console.error('Error fetching MFA status:', error)
+    }
+  }
+
+  const handleMfaSetup = async () => {
+    setMfaLoading(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/account/mfa/setup', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setMfaQrCode(data.qrCode)
+        setMfaSecret(data.secret)
+        setMfaStep('setup')
+        setMfaCode('')
+      } else {
+        const error = await res.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to start MFA setup' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Something went wrong' })
+    } finally {
+      setMfaLoading(false)
+    }
+  }
+
+  const handleMfaEnable = async () => {
+    setMfaLoading(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/account/mfa/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totp: mfaCode }),
+      })
+      if (res.ok) {
+        setMfaEnabled(true)
+        setMfaStep('idle')
+        setMfaQrCode('')
+        setMfaSecret('')
+        setMfaCode('')
+        setMessage({ type: 'success', text: 'Two-factor authentication enabled' })
+      } else {
+        const error = await res.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to enable MFA' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Something went wrong' })
+    } finally {
+      setMfaLoading(false)
+    }
+  }
+
+  const handleMfaDisable = async () => {
+    setMfaLoading(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/account/mfa/disable', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: mfaPassword }),
+      })
+      if (res.ok) {
+        setMfaEnabled(false)
+        setMfaStep('idle')
+        setMfaPassword('')
+        setMessage({ type: 'success', text: 'Two-factor authentication disabled' })
+      } else {
+        const error = await res.json()
+        setMessage({ type: 'error', text: error.error || 'Failed to disable MFA' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Something went wrong' })
+    } finally {
+      setMfaLoading(false)
+    }
+  }
 
   // Fetch favorite teams
   useEffect(() => {
@@ -368,46 +464,170 @@ export default function AccountPage() {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="glass-card rounded-xl p-6 max-w-2xl">
-          <h3 className="font-semibold mb-6">Change Password</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Current Password</label>
-              <input
-                type="password"
-                value={passwordData.current}
-                onChange={(e) => setPasswordData((prev) => ({ ...prev, current: e.target.value }))}
-                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
-                placeholder="Enter current password"
-              />
+        <div className="space-y-6 max-w-2xl">
+          {/* Change Password */}
+          <div className="glass-card rounded-xl p-6">
+            <h3 className="font-semibold mb-6">Change Password</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordData.current}
+                  onChange={(e) => setPasswordData((prev) => ({ ...prev, current: e.target.value }))}
+                  className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={passwordData.new}
+                  onChange={(e) => setPasswordData((prev) => ({ ...prev, new: e.target.value }))}
+                  className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
+                  placeholder="Min. 8 characters"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  value={passwordData.confirm}
+                  onChange={(e) => setPasswordData((prev) => ({ ...prev, confirm: e.target.value }))}
+                  className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
+                  placeholder="Re-enter new password"
+                />
+              </div>
+              <button
+                onClick={handlePasswordChange}
+                disabled={saving || !passwordData.current || !passwordData.new}
+                className="w-full py-3 brand-gradient text-white font-bold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Updating...' : 'Update Password'}
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">New Password</label>
-              <input
-                type="password"
-                value={passwordData.new}
-                onChange={(e) => setPasswordData((prev) => ({ ...prev, new: e.target.value }))}
-                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
-                placeholder="Min. 8 characters"
-              />
+          </div>
+
+          {/* Two-Factor Authentication */}
+          <div className="glass-card rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-2">
+              {mfaEnabled
+                ? <ShieldCheck className="w-5 h-5 text-green-500" />
+                : <ShieldOff className="w-5 h-5 text-muted-foreground" />
+              }
+              <h3 className="font-semibold">Two-Factor Authentication</h3>
+              {mfaEnabled && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 border border-green-500/30">
+                  Enabled
+                </span>
+              )}
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">Confirm Password</label>
-              <input
-                type="password"
-                value={passwordData.confirm}
-                onChange={(e) => setPasswordData((prev) => ({ ...prev, confirm: e.target.value }))}
-                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
-                placeholder="Re-enter new password"
-              />
-            </div>
-            <button
-              onClick={handlePasswordChange}
-              disabled={saving || !passwordData.current || !passwordData.new}
-              className="w-full py-3 brand-gradient text-white font-bold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Updating...' : 'Update Password'}
-            </button>
+            <p className="text-sm text-muted-foreground mb-6">
+              {mfaEnabled
+                ? 'Your account is protected with an authenticator app. You will need your app each time you sign in.'
+                : 'Add an extra layer of security by requiring a code from your authenticator app at sign-in.'}
+            </p>
+
+            {/* Idle state */}
+            {mfaStep === 'idle' && !mfaEnabled && (
+              <button
+                onClick={handleMfaSetup}
+                disabled={mfaLoading}
+                className="py-2.5 px-5 brand-gradient text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50"
+              >
+                {mfaLoading ? 'Loading...' : 'Enable 2FA'}
+              </button>
+            )}
+
+            {mfaStep === 'idle' && mfaEnabled && (
+              <button
+                onClick={() => { setMfaStep('disable'); setMfaPassword('') }}
+                className="py-2.5 px-5 border border-red-500/50 text-red-500 font-semibold rounded-lg hover:bg-red-500/10 transition-colors"
+              >
+                Disable 2FA
+              </button>
+            )}
+
+            {/* Setup flow — QR code */}
+            {mfaStep === 'setup' && (
+              <div className="space-y-5">
+                <div>
+                  <p className="text-sm font-semibold mb-2">1. Scan this QR code with your authenticator app</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Use Google Authenticator, Authy, or any TOTP-compatible app.
+                  </p>
+                  {mfaQrCode && (
+                    <div className="inline-block p-3 bg-white rounded-xl">
+                      <img src={mfaQrCode} alt="MFA QR code" className="w-44 h-44" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold mb-1">Can&apos;t scan? Enter this code manually:</p>
+                  <code className="text-xs bg-muted px-3 py-2 rounded-lg block font-mono tracking-wider break-all">
+                    {mfaSecret}
+                  </code>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold mb-2">2. Enter the 6-digit code from your app to confirm</p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary tracking-widest text-center text-lg"
+                    placeholder="000000"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleMfaEnable}
+                    disabled={mfaLoading || mfaCode.length !== 6}
+                    className="py-2.5 px-5 brand-gradient text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-brand-red/40 transition-all disabled:opacity-50"
+                  >
+                    {mfaLoading ? 'Verifying...' : 'Activate 2FA'}
+                  </button>
+                  <button
+                    onClick={() => { setMfaStep('idle'); setMfaQrCode(''); setMfaSecret(''); setMfaCode('') }}
+                    className="py-2.5 px-5 border border-border rounded-lg hover:bg-muted transition-colors font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Disable flow — password confirm */}
+            {mfaStep === 'disable' && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">Enter your password to confirm you want to disable 2FA.</p>
+                <input
+                  type="password"
+                  value={mfaPassword}
+                  onChange={(e) => setMfaPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-muted/50 border border-border rounded-lg focus:outline-none focus:border-primary"
+                  placeholder="Your password"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleMfaDisable}
+                    disabled={mfaLoading || !mfaPassword}
+                    className="py-2.5 px-5 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {mfaLoading ? 'Disabling...' : 'Confirm Disable'}
+                  </button>
+                  <button
+                    onClick={() => { setMfaStep('idle'); setMfaPassword('') }}
+                    className="py-2.5 px-5 border border-border rounded-lg hover:bg-muted transition-colors font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { verifyTOTP } from '@/lib/mfa'
 
 declare module 'next-auth' {
   interface User {
@@ -39,7 +40,8 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
+        totp: { label: 'Authenticator Code', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -63,6 +65,15 @@ export const authOptions: NextAuthOptions = {
 
         if (!passwordMatch) {
           return null
+        }
+
+        if (user.mfaEnabled) {
+          if (!credentials.totp) {
+            throw new Error('MFA_REQUIRED')
+          }
+          if (!user.mfaSecret || !verifyTOTP(user.mfaSecret, credentials.totp)) {
+            throw new Error('MFA_INVALID')
+          }
         }
 
         await prisma.user.update({
