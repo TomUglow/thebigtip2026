@@ -392,21 +392,6 @@ export default function DashboardClient({
 
         <MainEventCard competitions={competitions} />
 
-        {/* Empty State */}
-        {competitions.length === 0 && upcomingGames.length < 6 && recentResults.length < 6 && (
-          <div className="text-center py-16">
-            <Trophy className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-bold mb-2 font-display">No Events Yet</h2>
-            <p className="text-muted-foreground mb-6">Competitions and games will appear here once they&apos;re available.</p>
-            <Link
-              href="/lobby"
-              className="glass-button px-5 py-2.5 rounded-lg text-sm font-semibold hover-elevate inline-block"
-            >
-              Browse Lobby
-            </Link>
-          </div>
-        )}
-
         {/* Upcoming / Live Matches */}
         {upcomingGames.length >= 6 && (
           <section>
@@ -455,7 +440,23 @@ export default function DashboardClient({
               ) : (
                 <div className="py-12 text-center text-muted-foreground">
                   <Trophy className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">You haven&apos;t joined any competitions yet.</p>
+                  <p className="text-sm mb-4">You haven&apos;t joined any competitions yet.</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => { setShowJoinModal(true); setJoinError(''); setJoinCode('') }}
+                      className="glass-card px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 hover-elevate hover:border-primary/50 transition-colors mx-auto"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Join Private League
+                    </button>
+                    <Link
+                      href="/lobby"
+                      className="glass-button px-4 py-2 rounded-lg text-xs font-semibold hover-elevate inline-flex items-center gap-1.5"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      Browse Competitions
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>

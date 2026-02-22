@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       prisma.competition.findMany({
         where: {
           OR: [
-            { isPublic: true },
+            { isPublic: true, status: { in: ['active', 'upcoming'] } },
             { users: { some: { userId } } },
           ],
         },

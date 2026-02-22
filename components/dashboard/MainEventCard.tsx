@@ -105,7 +105,20 @@ export default function MainEventCard({ competitions: externalCompetitions }: Ma
     }
   }
 
-  if (!mainCompetition) return null
+  if (!mainCompetition) {
+    return (
+      <section>
+        <div className="glass-card rounded-xl overflow-hidden border-2 p-6" style={{ borderColor: '#FFD700' }}>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <span className="text-[10px] uppercase tracking-wider font-black px-2.5 py-0.5 rounded" style={{ backgroundColor: '#FFD700', color: '#000' }}>
+              Main Event
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">The main competition will appear here once it&apos;s available. Check back soon.</p>
+        </div>
+      </section>
+    )
+  }
 
   const state = getMainButtonState(mainCompetition)
 
